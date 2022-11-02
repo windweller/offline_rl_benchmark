@@ -1,8 +1,11 @@
 from d3rlpy.algos import DQN, DiscreteCQL
+from d3rlpy.ope import DiscreteFQE
 from offline_rl.envs.datasets import get_sepsis
 from offline_rl.envs.policy_wrappers import QLearningWrapper
 from offline_rl.envs.sepsis.env import evaluate_on_sepsis_environment
 from sklearn.model_selection import train_test_split
+
+from d3rlpy.metrics.scorer import initial_state_value_estimation_scorer
 
 # ===== POMDP setting ======
 cql = DiscreteCQL(use_gpu=False)
@@ -19,6 +22,16 @@ evaluation_policy = QLearningWrapper(cql)
 rew = evaluate_on_sepsis_environment(sepsis)(evaluation_policy)
 print(rew)
 
+# ===== Try Fitting FQE ====
+fqe = DiscreteFQE(algo=cql)
+fqe.build_with_dataset(dataset)
+
+metrics = fqe.fit(test_episodes, n_epochs=2,
+        scorers={
+            'init_value': initial_state_value_estimation_scorer
+        })
+print(metrics)
+
 # ===== MDP setting ======
 cql = DiscreteCQL(use_gpu=False)
 dataset, sepsis = get_sepsis('mdp-200')
@@ -28,4 +41,3 @@ evaluation_policy = QLearningWrapper(cql)
 rew = evaluate_on_sepsis_environment(sepsis)(evaluation_policy)
 print(rew)
 
-# ===== Try Fitting FQE ====

@@ -32,7 +32,7 @@ class ProbabilisticTorchPolicyProtocol(BasePolicyProtocol):
         raise NotImplementedError
 
 
-class QLearningWrapper(ProbabilisticPolicyProtocol):
+class QLearningEvaluationWrapper(ProbabilisticPolicyProtocol):
     r"""QLearningWrapper
     This wrapper handles state as numpy input.
     This should be used for final policy evaluation (with real environment)
@@ -67,12 +67,7 @@ class QLearningWrapper(ProbabilisticPolicyProtocol):
 
 class QLearningTorchWrapper(ProbabilisticTorchPolicyProtocol):
     r"""QLearningWrapper
-    This wrapper handles state as numpy input.
-    This should be used for final policy evaluation (with real environment)
-
-    evaluation_policy = QLearningWrapper(cql)
-    rew = evaluate_on_sepsis_environment(sepsis)(evaluation_policy)
-
+    This wrapper handles state as torch input.
     """
     def __init__(self, dqn: Union[DQN, DiscreteCQL]):
         """

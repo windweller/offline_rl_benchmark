@@ -15,13 +15,13 @@ import os
 from offline_rl.envs.sepsis.State import State
 from offline_rl.envs.sepsis.Action import Action
 from offline_rl.envs.sepsis.DataGenerator import DataGenerator
-from offline_rl.opes.protocols import ProbabilityMDPDatasetProtocol
+from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
-from offline_rl.algs.probabilistic_policy_wrappers import ProbabilisticPolicyProtocol
+from offline_rl.algs.discrete_policy_evaluation_wrappers import ProbabilisticPolicyProtocol
 
 from d3rlpy.dataset import MDPDataset, Transition
 
@@ -124,7 +124,7 @@ class Sepsis(gym.Env):
         raise NotImplementedError
 
 def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
-                        prep_for_is_ope=False) -> MDPDataset:
+                        prep_for_is_ope=False) -> DiscreteProbabilityMDPDataset:
     """
     Load the sepsis dataset
     :param df: the dataframe to load
@@ -160,7 +160,7 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
     terminals = np.concatenate(terminals_list, axis=0)
 
     if not prep_for_is_ope:
-        dataset = MDPDataset(
+        dataset = DiscreteProbabilityMDPDataset(
             observations=features,
             actions=actions,
             rewards=rewards,
@@ -170,7 +170,7 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
         dataset.action_probabilities = actions_prob
         dataset.action_as_probability = False
     else:
-        dataset = MDPDataset(
+        dataset = DiscreteProbabilityMDPDataset(
             observations=features,
             actions=actions_prob,
             rewards=rewards,
@@ -181,7 +181,7 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
 
     return dataset
 
-def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol) -> MDPDataset:
+def convert_sepsis_dataset_for_is_ope(dataset: DiscreteProbabilityMDPDataset) -> DiscreteProbabilityMDPDataset:
     """
     Convert the dataset to be used for IS OPE
 
@@ -192,7 +192,7 @@ def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol) ->
     :return:
     """
     assert dataset.action_as_probability is False, "The dataset is in the correct format"
-    dataset = MDPDataset(
+    dataset = DiscreteProbabilityMDPDataset(
         observations=dataset.observations,
         actions=dataset.action_probabilities,
         rewards=dataset.rewards,
@@ -202,7 +202,7 @@ def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol) ->
     dataset.action_as_probability = True
     return dataset
 
-def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetProtocol) -> MDPDataset:
+def convert_is_ope_sepsis_dataset_for_training(dataset: DiscreteProbabilityMDPDataset) -> DiscreteProbabilityMDPDataset:
     """
     Convert the dataset to be used for training
 
@@ -217,7 +217,7 @@ def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetPro
     # step 2: override actions to discrete actions
     # step 3: set the flag
 
-    new_dataset = MDPDataset(
+    new_dataset = DiscreteProbabilityMDPDataset(
         observations=dataset.observations,
         actions=dataset.action_probabilities.argmax(axis=1),
         rewards=dataset.rewards,

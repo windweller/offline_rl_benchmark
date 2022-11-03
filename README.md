@@ -25,8 +25,17 @@ Preliminary plan:
 - PG
 - BC + PG
 - BC + miniPG
+- OffPAC
+- OPPOSD
 - Other D3RLPy algorithms
 - Model-based selection (L-MOPO, MML)
+- DT
+
+`data_augs`:
+- Filter (Filtered-BC)
+- Data Augmentation stuff
+  - Reward relabeling (Q-DT)
+  - Trajectory stitching...
 
 `model_selection`
 - K-fold RS
@@ -43,12 +52,16 @@ Some TODOs:
 
 Plan:
 
-(Monday, Tuesday)
-1. ~~Add Sepsis-POMDP, MDP to D3RLPy format.~~
-2. ~~Test if FQE works out of box with Sepsis...~~
-3. Add WIS style OPE to benchmark, make it work w/ Discrete control algs in D3RLPy
-4. Add pMDP, PG to `algs` folder
-
+(Thurs)
+1. Verify PDIS works correctly...
+2. Add TutorBot...
+2. Add pMDP, PG, DiscreteBC, DiscreteMOPO to `algs` folder
+3. **Add evaluation wrappers for AWAC/SAC and others**
+4. Add model-selection method (this is a hyperparam loop...) (check SKLearn's API design) (works on MDPDataset)
+5. Add **data augs**: any-perc BC, and others (define interface first)
 
 Other Needs:
 1. We need test-cases to make sure OPE is correctly implemented.
+
+Resources/References:
+- https://github.com/tinkoff-ai/CORL 

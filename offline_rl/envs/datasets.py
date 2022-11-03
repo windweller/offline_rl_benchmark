@@ -15,6 +15,7 @@ from d3rlpy.dataset import MDPDataset
 from d3rlpy.metrics.scorer import evaluate_on_environment
 
 from offline_rl.envs.sepsis.env import Sepsis, load_sepsis_dataset
+from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset
 
 DATA_DIRECTORY = "offline_rl_data"
 GITHUB_URL = "https://github.com"
@@ -30,7 +31,7 @@ SEPSIS_ENVS = [
     'mdp-5000',
 ]
 
-def get_sepsis(env_name: str) -> Tuple[MDPDataset, Sepsis]:
+def get_sepsis(env_name: str) -> Tuple[DiscreteProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
     :return:

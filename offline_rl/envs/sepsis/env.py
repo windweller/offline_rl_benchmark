@@ -21,7 +21,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
-from offline_rl.envs.policy_wrappers import ProbabilisticActionWrapper
+from offline_rl.algs.probabilistic_policy_wrappers import ProbabilisticPolicyProtocol
 
 from d3rlpy.dataset import MDPDataset, Transition
 
@@ -181,7 +181,7 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
 
     return dataset
 
-def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol):
+def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol) -> MDPDataset:
     """
     Convert the dataset to be used for IS OPE
 
@@ -191,11 +191,18 @@ def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol):
     :param dataset:
     :return:
     """
-    assert dataset.action_as_probability is True, "The dataset is in the correct format"
-    dataset.actions = dataset.action_probabilities
+    assert dataset.action_as_probability is False, "The dataset is in the correct format"
+    dataset = MDPDataset(
+        observations=dataset.observations,
+        actions=dataset.action_probabilities,
+        rewards=dataset.rewards,
+        terminals=dataset.terminals,
+        discrete_action=False
+    )
     dataset.action_as_probability = True
+    return dataset
 
-def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetProtocol):
+def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetProtocol) -> MDPDataset:
     """
     Convert the dataset to be used for training
 
@@ -205,13 +212,21 @@ def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetPro
     :param dataset:
     :return:
     """
-    assert dataset.action_as_probability is False, "The dataset is already in the correct format"
+    assert dataset.action_as_probability is True, "The dataset is already in the correct format"
     # step 1: copy actions (action probabilities) to action_probabilities
-    dataset.action_probabilities = dataset.actions
     # step 2: override actions to discrete actions
-    dataset.actions = dataset.action_probabilities.argmax(axis=1)
     # step 3: set the flag
-    dataset.action_as_probability = False
+
+    new_dataset = MDPDataset(
+        observations=dataset.observations,
+        actions=dataset.action_probabilities.argmax(axis=1),
+        rewards=dataset.rewards,
+        terminals=dataset.terminals,
+        discrete_action=False
+    )
+    new_dataset.action_probabilities = dataset.actions
+    new_dataset.action_as_probability = False
+    return new_dataset
 
 def evaluate_on_sepsis_environment(
         env: Sepsis, n_trials: int = 10, epsilon: float = 0.0, batch_size: int = 64
@@ -225,7 +240,7 @@ def evaluate_on_sepsis_environment(
     :return:
     """
 
-    def scorer(algo: ProbabilisticActionWrapper, *args: Any) -> float:
+    def scorer(algo: ProbabilisticPolicyProtocol, *args: Any) -> float:
 
         np.random.seed(1998)
         N_TRAJECTORIES = 5000

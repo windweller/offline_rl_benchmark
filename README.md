@@ -48,3 +48,7 @@ Plan:
 2. ~~Test if FQE works out of box with Sepsis...~~
 3. Add WIS style OPE to benchmark, make it work w/ Discrete control algs in D3RLPy
 4. Add pMDP, PG to `algs` folder
+
+
+Other Needs:
+1. We need test-cases to make sure OPE is correctly implemented.

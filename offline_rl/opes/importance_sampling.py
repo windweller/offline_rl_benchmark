@@ -14,7 +14,7 @@ import torch
 
 from d3rlpy.dataset import Episode, Transition
 from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
-from offline_rl.algs.probabilistic_policy_wrappers import ProbabilisticPolicyProtocol
+from offline_rl.algs.discrete_policy_evaluation_wrappers import ProbabilisticPolicyProtocol
 
 def check_if_action_is_proper_probability(transition: Transition):
     assert type(transition.action) != int, "In order to be evaluated, the action must be a probability"
@@ -57,15 +57,13 @@ def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length:
         last = 1
         for t in range(int(length[i])):
             assert pibs[i, t] != 0
-            # changed these two lines so gradient can flow...
             last = last * (pies[i, t] / pibs[i, t])
             weights[i, t] = last
 
         wis_weights[i] = last
 
+    weights = np.clip(weights, clip_lower, clip_upper)
     if not no_weight_norm:
-        weights = np.clip(weights, clip_lower, clip_upper)
-
         weights_norm = weights.sum(axis=0)
         # step 1: \sum_n r_nt * w_nt
         weighted_r = (rewards * weights).sum(axis=0)
@@ -75,8 +73,7 @@ def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length:
         # step 3: \sum_t ((\sum_n r_nt * w_nt) / \sum_n w_nt)
         score = score.sum()
     else:
-        # TODO: is this correct for PDIS??
-        score = (rewards * wis_weights).sum(axis=1).mean()
+        score = (rewards * weights).sum(axis=1).mean()
 
     return score
 
@@ -133,7 +130,7 @@ def importance_sampling_scorer(
 
     return score
 
-def weighted_importance_sampling_scorer(
+def wis_scorer(
     algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
     clip_lower: float=1e-16, clip_upper: float=1e3
 ) -> float:
@@ -151,7 +148,7 @@ def weighted_importance_sampling_scorer(
 
     return score
 
-def per_decision_importance_sampling_scorer(
+def pdis_scorer(
         algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
         clip_lower: float = 1e-16, clip_upper: float = 1e3
 ) -> float:
@@ -161,7 +158,7 @@ def per_decision_importance_sampling_scorer(
                               clip_lower=clip_lower, clip_upper=clip_upper)
     return score
 
-def consistently_weighted_per_decision_importance_sampling_scorer(
+def cwpdis_scorer(
         algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
         clip_lower: float = 1e-16, clip_upper: float = 1e3
 ) -> float:

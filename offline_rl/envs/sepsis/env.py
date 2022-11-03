@@ -15,8 +15,9 @@ import os
 from offline_rl.envs.sepsis.State import State
 from offline_rl.envs.sepsis.Action import Action
 from offline_rl.envs.sepsis.DataGenerator import DataGenerator
-import warnings
+from offline_rl.opes.protocols import ProbabilityMDPDatasetProtocol
 
+import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
@@ -39,8 +40,16 @@ class Sepsis(gym.Env):
 
     PROB_DIAB = 0.2
 
-    def __init__(self, env_name: str, all_states: pd.DataFrame):
+    def __init__(self, env_name: str, all_states: pd.DataFrame, prep_for_is_ope: bool = False):
+        """
+
+        :param env_name: this is to determine mdp vs. pomdp, correct state size
+        :param all_states: this is for test on the true environment
+        :param prep_for_is_ope: this will set the correct action space, so that Alg.build_with_dataset and Alg.build_with_env
+                                will work in the same way
+        """
         self.env_name = env_name.split('-')[0]
+        self.prep_for_is_ope = prep_for_is_ope
         self._init_env()
 
         self.all_states = all_states
@@ -114,10 +123,15 @@ class Sepsis(gym.Env):
         """
         raise NotImplementedError
 
-def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis) -> MDPDataset:
+def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
+                        prep_for_is_ope=False) -> MDPDataset:
     """
     Load the sepsis dataset
-    :param df:
+    :param df: the dataframe to load
+    :param prep_for_is_ope: whether to prepare the dataset for IS OPE. Since D3RLPy does not store action probabilities,
+                            we need to directly add action probabilities to action (pretend it's a multi-dim continuous action space).
+                            This will later be used by our OPE class to compute IS OPE.
+                            However, if we flag is True and try to learn a discrete control policy (or FQE), it will fail.
     :return:
     """
     features_list = []
@@ -141,21 +155,63 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis) -> MDPDataset:
 
     features = np.concatenate(features_list, axis=0)
     actions = np.concatenate(actions_list, axis=0)
+    actions_prob = np.concatenate(actions_prob_list, axis=0)
     rewards = np.concatenate(rewards_list, axis=0)
     terminals = np.concatenate(terminals_list, axis=0)
 
-    dataset = MDPDataset(
-        observations=features,
-        actions=actions,
-        rewards=rewards,
-        terminals=terminals,
-        discrete_action=True
-    )
-
-    dataset.action_probabilities = np.concatenate(actions_prob_list, axis=0)
+    if not prep_for_is_ope:
+        dataset = MDPDataset(
+            observations=features,
+            actions=actions,
+            rewards=rewards,
+            terminals=terminals,
+            discrete_action=True
+        )
+        dataset.action_probabilities = actions_prob
+        dataset.action_as_probability = False
+    else:
+        dataset = MDPDataset(
+            observations=features,
+            actions=actions_prob,
+            rewards=rewards,
+            terminals=terminals,
+            discrete_action=False
+        )
+        dataset.action_as_probability = True
 
     return dataset
 
+def convert_sepsis_dataset_for_is_ope(dataset: ProbabilityMDPDatasetProtocol):
+    """
+    Convert the dataset to be used for IS OPE
+
+    Note that if action_as_probability is True, it means that this dataset currently is used for training
+    We can convert it for IS OPE
+
+    :param dataset:
+    :return:
+    """
+    assert dataset.action_as_probability is True, "The dataset is in the correct format"
+    dataset.actions = dataset.action_probabilities
+    dataset.action_as_probability = True
+
+def convert_is_ope_sepsis_dataset_for_training(dataset: ProbabilityMDPDatasetProtocol):
+    """
+    Convert the dataset to be used for training
+
+    Note that if action_as_probability is False, it means that this dataset currently is used for OPE
+    We can convert it for Training
+
+    :param dataset:
+    :return:
+    """
+    assert dataset.action_as_probability is False, "The dataset is already in the correct format"
+    # step 1: copy actions (action probabilities) to action_probabilities
+    dataset.action_probabilities = dataset.actions
+    # step 2: override actions to discrete actions
+    dataset.actions = dataset.action_probabilities.argmax(axis=1)
+    # step 3: set the flag
+    dataset.action_as_probability = False
 
 def evaluate_on_sepsis_environment(
         env: Sepsis, n_trials: int = 10, epsilon: float = 0.0, batch_size: int = 64
@@ -182,7 +238,7 @@ def evaluate_on_sepsis_environment(
 
         for state in np.array_split(all_feats, num_batches, axis=0):
 
-            action_distributions.append(algo.get_action_probabilities(state)) # (batch_size, num_actions)
+            action_distributions.append(algo.predict_action_probabilities(state)) # (batch_size, num_actions)
 
         policy = np.concatenate(action_distributions, axis=0) # (num_states, num_actions)
 

@@ -1,7 +1,7 @@
 from d3rlpy.algos import DQN, DiscreteCQL
 from d3rlpy.ope import DiscreteFQE
 from offline_rl.envs.datasets import get_sepsis
-from offline_rl.envs.policy_wrappers import QLearningWrapper
+from offline_rl.algs.probabilistic_policy_wrappers import QLearningWrapper
 from offline_rl.envs.sepsis.env import evaluate_on_sepsis_environment
 from sklearn.model_selection import train_test_split
 

@@ -14,11 +14,14 @@ import pandas as pd
 from d3rlpy.dataset import MDPDataset
 from d3rlpy.metrics.scorer import evaluate_on_environment
 
-from offline_rl.envs.sepsis.env import Sepsis, load_sepsis_dataset
 from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset
 
 DATA_DIRECTORY = "offline_rl_data"
 GITHUB_URL = "https://github.com"
+
+# ======= Sepsis =======
+
+from offline_rl.envs.sepsis.env import Sepsis, load_sepsis_dataset
 
 SEPSIS_URL = f"{GITHUB_URL}/StanfordAI4HI/Split-select-retrain/raw/main/envs/sepsis/sontag_sepsis.zip"
 
@@ -55,5 +58,42 @@ def get_sepsis(env_name: str) -> Tuple[DiscreteProbabilityMDPDataset, Sepsis]:
     filepath = f"{DATA_DIRECTORY}/sontag_sepsis/marginalized_sepsis_{data_size}_w_noise_05" + appendage + ".csv"
     data = pd.read_csv(filepath)
     dataset = load_sepsis_dataset(data, env)
+
+    return dataset, env
+
+# ======= Tutorbot =======
+
+from offline_rl.envs.tutorbot.env import TutorBot, load_tutorbot_dataset
+
+TUTOR_URL = f"{GITHUB_URL}/StanfordAI4HI/Split-select-retrain/raw/main/envs/tutorbot/tutorbot_data.zip"
+
+TUTOR_ENVS = [
+    'tutor-200',
+    'tutor-80'
+]
+
+def get_tutorbot(env_name: str) -> Tuple[DiscreteProbabilityMDPDataset, TutorBot]:
+    """
+
+    :param env_name: dataset size
+    :return:
+    """
+    assert env_name in TUTOR_ENVS, print("available env names are: ", TUTOR_ENVS)
+
+    file_name = 'tutorbot_data.zip'
+    data_path = os.path.join(DATA_DIRECTORY, file_name)
+
+    if not os.path.exists(data_path):
+        os.makedirs(DATA_DIRECTORY, exist_ok=True)
+        print(f"Donwloading tutorbot_data.zip into {data_path}...")
+        request.urlretrieve(TUTOR_URL, data_path)
+        shutil.unpack_archive(data_path, DATA_DIRECTORY)
+
+    env = TutorBot(env_name)
+
+    _, data_size = env_name.split('-')
+    filepath = f"{DATA_DIRECTORY}/tutorbot_data/student_{data_size}_rand.csv"
+    data = pd.read_csv(filepath)
+    dataset = load_tutorbot_dataset(data, env)
 
     return dataset, env

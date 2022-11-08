@@ -32,6 +32,8 @@ class ProbabilityMDPDataset(MDPDataset):
     # whether the actions array has probability for each action; only for discrete actions
     action_as_probability: bool
     observed_actions: np.ndarray
+    # because we need to flag is_discrete to store continuous probabilities
+    is_observed_action_discrete: bool
 
 def convert_dataset_for_is_ope(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
     """
@@ -49,11 +51,12 @@ def convert_dataset_for_is_ope(dataset: ProbabilityMDPDataset) -> ProbabilityMDP
         actions=dataset.action_probabilities,
         rewards=dataset.rewards,
         terminals=dataset.terminals,
-        discrete_action=dataset.is_action_discrete()
+        discrete_action=False  # needs to be false to keep all probability
     )
     new_dataset.action_probabilities = dataset.action_probabilities
     new_dataset.action_as_probability = True
     new_dataset.observed_actions = dataset.observed_actions
+    new_dataset.is_observed_action_discrete = dataset.is_observed_action_discrete
     return new_dataset
 
 def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
@@ -76,10 +79,11 @@ def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> Proba
         actions=dataset.action_probabilities.argmax(axis=1),
         rewards=dataset.rewards,
         terminals=dataset.terminals,
-        discrete_action=dataset.is_action_discrete()
+        discrete_action=dataset.is_observed_action_discrete
     )
     new_dataset.action_probabilities = dataset.action_probabilities
     new_dataset.action_as_probability = True
     new_dataset.observed_actions = dataset.observed_actions
+    new_dataset.is_observed_action_discrete = dataset.is_observed_action_discrete
 
     return new_dataset

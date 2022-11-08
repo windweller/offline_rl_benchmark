@@ -95,17 +95,19 @@ def load_tutorbot_dataset(df: pd.DataFrame, env: TutorBot,
         dataset.observed_actions = actions
         dataset.action_probabilities = actions_prob
         dataset.action_as_probability = False
+        dataset.is_observed_action_discrete = True
     else:
         dataset = ProbabilityMDPDataset(
             observations=features,
             actions=actions_prob,
             rewards=rewards,
             terminals=terminals,
-            discrete_action=True
+            discrete_action=False
         )
         dataset.observed_actions = actions
         dataset.action_probabilities = actions_prob
         dataset.action_as_probability = True
+        dataset.is_observed_action_discrete = True
 
     return dataset
 

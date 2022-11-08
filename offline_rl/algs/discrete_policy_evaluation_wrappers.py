@@ -119,7 +119,7 @@ class DiscreteBCEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
             state = state.to(self.policy._device)
 
         # Get action probability through BC or DiscreteBC
-        action_prob = self.policy_impl._imitator(state)  # (batch_size, n_actions)
+        action_prob = self.policy_impl._imitator(state).exp()  # (batch_size, n_actions)
 
         if self.policy._use_gpu:
             action_prob = action_prob.cpu()

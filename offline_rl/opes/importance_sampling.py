@@ -17,8 +17,8 @@ from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
 from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
 def check_if_action_is_proper_probability(transition: Transition):
-    assert type(transition.action) != int, "In order to be evaluated, the action must be a probability"
-    assert np.abs(np.sum(transition.action) - 1) < 1e-6, "In order to be evaluated, the action must be a probability"
+    assert type(transition.action) != np.int32, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
+    assert np.abs(np.sum(transition.action) - 1) < 1e-6, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
 
 def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np.ndarray, max_time: int,
              no_weight_norm: bool=False, clip_lower: float=1e-16, clip_upper: float=1e3) -> Tuple[float, np.ndarray]:

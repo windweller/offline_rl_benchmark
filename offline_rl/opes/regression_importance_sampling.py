@@ -43,7 +43,7 @@ class RegressionIS(object):
 
         # we need to check this dataset
         if dataset.is_action_discrete():
-            assert np.max(dataset.episodes[0].transitions[0].action) == 1, "Should not pass in " \
+            assert type(dataset.episodes[0].transitions[0].action) == np.int32, "Should not pass in " \
                                                                            "DiscreteProbabilityMDPDataset, use original " \
                                                                            "MDPDataset for training instead."
 
@@ -79,7 +79,7 @@ class RegressionIS(object):
                 all_actions_probs.append(action_probabilities)
 
         all_actions_probs = np.concatenate(all_actions_probs, axis=0)
-        assert all_actions_probs.shape[0] == dataset.size, "The number of action probabilities should be the same as " \
+        assert all_actions_probs.shape[0] == dataset.actions.shape[0], "The number of action probabilities should be the same as " \
                                                               "the number of transitions in the dataset."
 
         new_dataset = ProbabilityMDPDataset(
@@ -92,4 +92,6 @@ class RegressionIS(object):
         new_dataset.action_probabilities = all_actions_probs
         new_dataset.observed_actions = dataset.actions
         new_dataset.action_as_probability = False
+        new_dataset.is_observed_action_discrete = dataset.is_action_discrete()
+
         return new_dataset

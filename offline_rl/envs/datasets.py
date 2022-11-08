@@ -14,7 +14,7 @@ import pandas as pd
 from d3rlpy.dataset import MDPDataset
 from d3rlpy.metrics.scorer import evaluate_on_environment
 
-from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset
+from offline_rl.envs.dataset import ProbabilityMDPDataset
 
 DATA_DIRECTORY = "offline_rl_data"
 GITHUB_URL = "https://github.com"
@@ -34,7 +34,7 @@ SEPSIS_ENVS = [
     'mdp-5000',
 ]
 
-def get_sepsis(env_name: str) -> Tuple[DiscreteProbabilityMDPDataset, Sepsis]:
+def get_sepsis(env_name: str) -> Tuple[ProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
     :return:
@@ -72,7 +72,7 @@ TUTOR_ENVS = [
     'tutor-80'
 ]
 
-def get_tutorbot(env_name: str) -> Tuple[DiscreteProbabilityMDPDataset, TutorBot]:
+def get_tutorbot(env_name: str) -> Tuple[ProbabilityMDPDataset, TutorBot]:
     """
 
     :param env_name: dataset size

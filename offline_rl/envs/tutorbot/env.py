@@ -14,7 +14,7 @@ import pickle
 import os
 
 from offline_rl.envs.tutorbot.tutor_env import StudentEnv
-from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset, CSVDataset
+from offline_rl.envs.dataset import ProbabilityMDPDataset, CSVDataset
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
 
@@ -50,7 +50,7 @@ class TutorBot(StudentEnv, CSVDataset):
         return init_state.reshape(1, -1)
 
 def load_tutorbot_dataset(df: pd.DataFrame, env: TutorBot,
-                        prep_for_is_ope=False) -> DiscreteProbabilityMDPDataset:
+                        prep_for_is_ope=False) -> ProbabilityMDPDataset:
     """
     Can consider merging this w/ Sepsis one since it's largely identical
 
@@ -85,23 +85,26 @@ def load_tutorbot_dataset(df: pd.DataFrame, env: TutorBot,
     terminals = np.concatenate(terminals_list, axis=0)
 
     if not prep_for_is_ope:
-        dataset = DiscreteProbabilityMDPDataset(
+        dataset = ProbabilityMDPDataset(
             observations=features,
             actions=actions,
             rewards=rewards,
             terminals=terminals,
             discrete_action=True
         )
+        dataset.observed_actions = actions
         dataset.action_probabilities = actions_prob
         dataset.action_as_probability = False
     else:
-        dataset = DiscreteProbabilityMDPDataset(
+        dataset = ProbabilityMDPDataset(
             observations=features,
             actions=actions_prob,
             rewards=rewards,
             terminals=terminals,
-            discrete_action=False
+            discrete_action=True
         )
+        dataset.observed_actions = actions
+        dataset.action_probabilities = actions_prob
         dataset.action_as_probability = True
 
     return dataset

@@ -27,3 +27,26 @@ print(clipped_is_score)
 print(weighted_is_score)
 print(cwpdis_score)
 print(pdis_score)
+
+# ======= BC =======
+
+# from d3rlpy.algos import BC, DiscreteBC
+# from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteBCEvaluationWrapper
+#
+# bc = DiscreteBC(use_gpu=False)
+# dataset, sepsis = get_sepsis('pomdp-200')
+# # cql.build_with_env(sepsis)
+# bc.build_with_dataset(dataset)
+#
+# evaluation_policy = DiscreteBCEvaluationWrapper(bc)
+# dataset_with_prob = convert_dataset_for_is_ope(dataset)
+#
+# clipped_is_score = importance_sampling_scorer(evaluation_policy, dataset_with_prob.episodes)
+# weighted_is_score = wis_scorer(evaluation_policy, dataset_with_prob.episodes)
+# cwpdis_score = cwpdis_scorer(evaluation_policy, dataset_with_prob.episodes)
+# pdis_score = pdis_scorer(evaluation_policy, dataset_with_prob.episodes)
+#
+# print(clipped_is_score)
+# print(weighted_is_score)
+# print(cwpdis_score)
+# print(pdis_score)

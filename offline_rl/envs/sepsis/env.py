@@ -15,13 +15,13 @@ import os
 from offline_rl.envs.sepsis.State import State
 from offline_rl.envs.sepsis.Action import Action
 from offline_rl.envs.sepsis.DataGenerator import DataGenerator
-from offline_rl.envs.dataset import DiscreteProbabilityMDPDataset, CSVDataset
+from offline_rl.envs.dataset import ProbabilityMDPDataset, CSVDataset
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
-from offline_rl.algs.discrete_policy_evaluation_wrappers import ProbabilisticPolicyProtocol
+from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
 from d3rlpy.dataset import MDPDataset, Transition
 
@@ -124,7 +124,7 @@ class Sepsis(gym.Env, CSVDataset):
         raise NotImplementedError
 
 def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
-                        prep_for_is_ope=False) -> DiscreteProbabilityMDPDataset:
+                        prep_for_is_ope=False) -> ProbabilityMDPDataset:
     """
     Load the sepsis dataset
     :param df: the dataframe to load
@@ -160,23 +160,26 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
     terminals = np.concatenate(terminals_list, axis=0)
 
     if not prep_for_is_ope:
-        dataset = DiscreteProbabilityMDPDataset(
+        dataset = ProbabilityMDPDataset(
             observations=features,
             actions=actions,
             rewards=rewards,
             terminals=terminals,
             discrete_action=True
         )
+        dataset.observed_actions = actions
         dataset.action_probabilities = actions_prob
         dataset.action_as_probability = False
     else:
-        dataset = DiscreteProbabilityMDPDataset(
+        dataset = ProbabilityMDPDataset(
             observations=features,
             actions=actions_prob,
             rewards=rewards,
             terminals=terminals,
-            discrete_action=False
+            discrete_action=True
         )
+        dataset.observed_actions = actions
+        dataset.action_probabilities = actions_prob
         dataset.action_as_probability = True
 
     return dataset
@@ -193,7 +196,7 @@ def evaluate_on_sepsis_environment(
     :return:
     """
 
-    def scorer(algo: ProbabilisticPolicyProtocol, *args: Any) -> float:
+    def scorer(algo: DiscreteProbabilisticPolicyProtocol, *args: Any) -> float:
 
         np.random.seed(1998)
         N_TRAJECTORIES = 5000

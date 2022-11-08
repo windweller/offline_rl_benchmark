@@ -53,13 +53,14 @@ Some TODOs:
 Plan:
 
 (Thurs)
-1. Add TutorBot... (30 minutes)
+1. ~~Add TutorBot... (30 minutes)~~
 2. Add pMDP, PG, BC+PG, DiscreteMOPO to `algs` folder (just pMDP, 20 minutes)
 3. **Add evaluation wrappers for AWAC/SAC and others** (20 minutes?)
 4. Add **data augs**: any-perc BC, and others (define interface first)
 5. Add model-selection method (this is a hyperparam loop...) (check SKLearn's API design) (works on MDPDataset)
 6. Add BVFT!! (How does BVFT fit? Probably into `model_selection`)
 7. Add behavior regression thingy! (20 minutes?)
+8. Add DICE-RL (PRIORITY)
 
 Other Needs:
 1. We need test-cases to make sure OPE is correctly implemented.

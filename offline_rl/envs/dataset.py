@@ -20,16 +20,20 @@ class CSVDataset(object):
         raise Exception
 
 
-class DiscreteProbabilityMDPDataset(MDPDataset):
+class ProbabilityMDPDataset(MDPDataset):
     """
     This class functions the same as MDPDataset, but with 2 new fields
     It is a workaround for MDPDataset not being able to handle both discrete actions and action probabilities
+
+    We only do this because we want to use dataset.episodes to get episodes and batches -- and they can only handle
+    MDPDataset
     """
     action_probabilities: np.ndarray
     # whether the actions array has probability for each action; only for discrete actions
     action_as_probability: bool
+    observed_actions: np.ndarray
 
-def convert_dataset_for_is_ope(dataset: DiscreteProbabilityMDPDataset) -> DiscreteProbabilityMDPDataset:
+def convert_dataset_for_is_ope(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
     """
     Convert the dataset to be used for IS OPE
 
@@ -40,17 +44,19 @@ def convert_dataset_for_is_ope(dataset: DiscreteProbabilityMDPDataset) -> Discre
     :return:
     """
     assert dataset.action_as_probability is False, "The dataset is in the correct format"
-    dataset = DiscreteProbabilityMDPDataset(
+    new_dataset = ProbabilityMDPDataset(
         observations=dataset.observations,
         actions=dataset.action_probabilities,
         rewards=dataset.rewards,
         terminals=dataset.terminals,
-        discrete_action=False
+        discrete_action=dataset.is_action_discrete()
     )
-    dataset.action_as_probability = True
-    return dataset
+    new_dataset.action_probabilities = dataset.action_probabilities
+    new_dataset.action_as_probability = True
+    new_dataset.observed_actions = dataset.observed_actions
+    return new_dataset
 
-def convert_is_ope_dataset_for_training(dataset: DiscreteProbabilityMDPDataset) -> DiscreteProbabilityMDPDataset:
+def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
     """
     Convert the dataset to be used for training
 
@@ -65,13 +71,15 @@ def convert_is_ope_dataset_for_training(dataset: DiscreteProbabilityMDPDataset) 
     # step 2: override actions to discrete actions
     # step 3: set the flag
 
-    new_dataset = DiscreteProbabilityMDPDataset(
+    new_dataset = ProbabilityMDPDataset(
         observations=dataset.observations,
         actions=dataset.action_probabilities.argmax(axis=1),
         rewards=dataset.rewards,
         terminals=dataset.terminals,
-        discrete_action=False
+        discrete_action=dataset.is_action_discrete()
     )
-    new_dataset.action_probabilities = dataset.actions
-    new_dataset.action_as_probability = False
+    new_dataset.action_probabilities = dataset.action_probabilities
+    new_dataset.action_as_probability = True
+    new_dataset.observed_actions = dataset.observed_actions
+
     return new_dataset

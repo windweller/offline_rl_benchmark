@@ -14,7 +14,7 @@ import torch
 
 from d3rlpy.dataset import Episode, Transition
 from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
-from offline_rl.algs.discrete_policy_evaluation_wrappers import ProbabilisticPolicyProtocol
+from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
 def check_if_action_is_proper_probability(transition: Transition):
     assert type(transition.action) != int, "In order to be evaluated, the action must be a probability"
@@ -77,9 +77,9 @@ def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length:
 
     return score
 
-def compute_pib_pie(algo: ProbabilisticPolicyProtocol, episodes: List[Episode]) -> Tuple[np.ndarray, np.ndarray,
-                                                                                         np.ndarray, np.ndarray,
-                                                                                         int]:
+def compute_pib_pie(algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode]) -> Tuple[np.ndarray, np.ndarray,
+                                                                                                 np.ndarray, np.ndarray,
+                                                                                                 int]:
     n = len(episodes)
     max_t = max([len(episode) for episode in episodes])
 
@@ -111,7 +111,7 @@ def compute_pib_pie(algo: ProbabilisticPolicyProtocol, episodes: List[Episode]) 
     return pibs, pies, rewards, lengths, max_t
 
 def importance_sampling_scorer(
-    algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
+    algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
     clip_lower: float=1e-16, clip_upper: float=1e3
 ) -> float:
     """
@@ -131,7 +131,7 @@ def importance_sampling_scorer(
     return score
 
 def wis_scorer(
-    algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
+    algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
     clip_lower: float=1e-16, clip_upper: float=1e3
 ) -> float:
     """
@@ -149,7 +149,7 @@ def wis_scorer(
     return score
 
 def pdis_scorer(
-        algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
+        algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
         clip_lower: float = 1e-16, clip_upper: float = 1e3
 ) -> float:
     check_if_action_is_proper_probability(episodes[0].transitions[0])
@@ -159,7 +159,7 @@ def pdis_scorer(
     return score
 
 def cwpdis_scorer(
-        algo: ProbabilisticPolicyProtocol, episodes: List[Episode],
+        algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
         clip_lower: float = 1e-16, clip_upper: float = 1e3
 ) -> float:
     """

@@ -3,7 +3,9 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast, 
 import torch
 import torch.nn.functional as F
 from d3rlpy.algos import DQN, DiscreteCQL
+from d3rlpy.algos import BC, DiscreteBC
 from d3rlpy.algos.torch.dqn_impl import DQNImpl
+from d3rlpy.algos.torch.bc_impl import BCImpl, DiscreteBCImpl
 from d3rlpy.algos.base import AlgoBase, AlgoImplBase
 
 import gym
@@ -22,25 +24,31 @@ class BasePolicyProtocol(Protocol):
         return self.policy.n_frames
 
 
-class ProbabilisticPolicyProtocol(BasePolicyProtocol):
+class DiscreteProbabilisticPolicyProtocol(BasePolicyProtocol):
     def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
-class ProbabilisticTorchPolicyProtocol(BasePolicyProtocol):
+class DiscreteProbabilisticTorchPolicyProtocol(BasePolicyProtocol):
     def predict_action_probabilities(self, state: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
 
-class QLearningEvaluationWrapper(ProbabilisticPolicyProtocol):
+class ContinuousProbabilisticPolicyProtocol(BasePolicyProtocol):
+    def predict_action_probabilities(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+
+class QLearningEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
     r"""QLearningWrapper
     This wrapper handles state as numpy input.
     This should be used for final policy evaluation (with real environment)
 
-    evaluation_policy = QLearningWrapper(cql)
+    evaluation_policy = QLearningWrapper(discrete_cql)
     rew = evaluate_on_sepsis_environment(sepsis)(evaluation_policy)
 
     """
+
     def __init__(self, dqn: Union[DQN, DiscreteCQL]):
         """
 
@@ -65,10 +73,12 @@ class QLearningEvaluationWrapper(ProbabilisticPolicyProtocol):
 
         return action_prob.detach().numpy()
 
-class QLearningTorchWrapper(ProbabilisticTorchPolicyProtocol):
+
+class DiscreteQLearningTorchWrapperDiscrete(DiscreteProbabilisticTorchPolicyProtocol):
     r"""QLearningWrapper
     This wrapper handles state as torch input.
     """
+
     def __init__(self, dqn: Union[DQN, DiscreteCQL]):
         """
 
@@ -86,3 +96,61 @@ class QLearningTorchWrapper(ProbabilisticTorchPolicyProtocol):
         action_prob = F.softmax(q_values, dim=1)
 
         return action_prob
+
+
+class DiscreteBCEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
+    r"""BC Wrapper
+    """
+
+    def __init__(self, bc: DiscreteBC):
+        """
+
+        :param bc:
+        :return:
+        """
+        self.policy = bc
+        self.policy_impl: DiscreteBCImpl = bc._impl
+
+    def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
+        assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"
+        state = torch.from_numpy(state).float()
+
+        if self.policy._use_gpu:
+            state = state.to(self.policy._device)
+
+        # Get action probability through BC or DiscreteBC
+        action_prob = self.policy_impl._imitator(state)  # (batch_size, n_actions)
+
+        if self.policy._use_gpu:
+            action_prob = action_prob.cpu()
+
+        return action_prob.detach().numpy()
+
+
+class BCEvaluationWrapper(ContinuousProbabilisticPolicyProtocol):
+    def __init__(self, bc: BC):
+        """
+
+        :param bc:
+        :return:
+        """
+        self.policy = bc
+        self.policy_impl: BCImpl = bc._impl
+
+    def predict_action_probabilities(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
+        assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"
+        state = torch.from_numpy(state).float()
+        action = torch.from_numpy(action).float()
+
+        if self.policy._use_gpu:
+            state = state.to(self.policy._device)
+            action = action.to(self.policy._device)
+
+        # Get action probability through BC
+        normal_dist = self.policy_impl._imitator.dist(state)  # (batch_size, n_actions)
+        action_prob = normal_dist.log_prob(action).exp()  # (batch_size, n_actions)
+
+        if self.policy._use_gpu:
+            action_prob = action_prob.cpu()
+
+        return action_prob.detach().numpy()

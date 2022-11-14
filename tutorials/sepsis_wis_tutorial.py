@@ -28,6 +28,10 @@ print(weighted_is_score)
 print(cwpdis_score)
 print(pdis_score)
 
+rew = evaluate_on_sepsis_environment(sepsis)(evaluation_policy)
+
+print(rew)
+
 # ======= BC =======
 
 # from d3rlpy.algos import BC, DiscreteBC

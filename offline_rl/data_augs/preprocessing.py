@@ -97,9 +97,13 @@ class ReplaceOperation(Operation):
                                         batch_size=32,
                                         rollout_horizon=1)
 
-    def operate(self, transitions: List[Transition]) -> List[Transition]:
+    def operate(self, dataset: MDPDataset) -> MDPDataset:
         # MOPO sample more things
         # Since MOPO works, this should work too
+        transitions: List[Transition] = []
+        for ep in dataset.episodes:
+            transitions.extend(ep.transitions)
+
         trajs = self.model_runner.generate_new_data(transitions)
 
         return trajs

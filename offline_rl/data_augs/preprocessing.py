@@ -2,6 +2,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Type, Tuple, cast
 
 import gym
 import numpy as np
+import random
 import torch
 
 import d3rlpy
@@ -68,6 +69,14 @@ class DeleteOperation(Operation):
 class ReplaceOperation(Operation):
     model_runner: ModelRunner
 
+    def __init__(
+        self,
+        dataset: Optional[MDPDataset] = None,
+        rate: float = 1.0,
+    ):
+        self.rate = rate
+        self.fit_with_dataset(dataset)
+
     def fit_with_dataset(self, dataset: MDPDataset) -> None:
         dynamics_encoder = d3rlpy.models.encoders.VectorEncoderFactory(
             hidden_units=[200, 200, 200, 200],
@@ -102,6 +111,8 @@ class ReplaceOperation(Operation):
         # Since MOPO works, this should work too
         transitions: List[Transition] = []
         for ep in dataset.episodes:
+            if random.uniform(0, 1) > self.rate:
+                pass
             transitions.extend(ep.transitions)
 
         trajs = self.model_runner.generate_new_data(transitions)

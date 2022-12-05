@@ -40,7 +40,6 @@ estimator = NeuralDice(nu_encoder, zeta_encoder, nu_learning_rate=1e-3, zeta_lea
 running_losses = []
 running_estimates = []
 
-# OK, I don't care if this trains...I just want a value out, no errors
 for step in tqdm(range(num_steps)):
     for env_step, next_env_step in iterator:
         initial_steps_batch = next(init_iterator)

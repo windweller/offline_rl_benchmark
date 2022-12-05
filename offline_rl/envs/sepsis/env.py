@@ -21,7 +21,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast
-from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
+from offline_rl.algs.policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
 from d3rlpy.dataset import MDPDataset, Transition
 

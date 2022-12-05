@@ -2,7 +2,7 @@
 
 from d3rlpy.algos import DQN, DiscreteCQL
 from offline_rl.envs.datasets import get_sepsis
-from offline_rl.algs.discrete_policy_evaluation_wrappers import QLearningEvaluationWrapper
+from offline_rl.algs.policy_evaluation_wrappers import QLearningEvaluationWrapper
 from offline_rl.envs.sepsis.env import evaluate_on_sepsis_environment
 from offline_rl.envs.dataset import convert_dataset_for_is_ope, convert_is_ope_dataset_for_training
 from sklearn.model_selection import train_test_split

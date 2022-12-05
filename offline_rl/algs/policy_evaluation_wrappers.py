@@ -16,13 +16,16 @@ class BasePolicyProtocol(Protocol):
     policy: AlgoBase
     policy_impl: AlgoImplBase
 
-    def device(self) -> torch.device:
-        return self.policy.device()
+    def device(self) -> str:
+        # we leave this for individual policy wrapper to implement
+        raise NotImplementedError
+
+    def use_gpu(self) -> bool:
+        raise NotImplementedError
 
     @property
     def n_frames(self) -> int:
         return self.policy.n_frames
-
 
 class DiscreteProbabilisticPolicyProtocol(BasePolicyProtocol):
     def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
@@ -58,6 +61,12 @@ class QLearningEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
         """
         self.policy = dqn
         self.policy_impl: DQNImpl = dqn._impl
+
+    def device(self) -> str:
+        return self.policy._device
+
+    def use_gpu(self) -> bool:
+        return self.policy._use_gpu
 
     def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
         assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"
@@ -111,6 +120,12 @@ class DiscreteBCEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
         self.policy = bc
         self.policy_impl: DiscreteBCImpl = bc._impl
 
+    def device(self) -> str:
+        return self.policy._device
+
+    def use_gpu(self) -> bool:
+        return self.policy._use_gpu
+
     def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
         assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"
         state = torch.from_numpy(state).float()
@@ -136,6 +151,12 @@ class BCEvaluationWrapper(ContinuousProbabilisticPolicyProtocol):
         """
         self.policy = bc
         self.policy_impl: BCImpl = bc._impl
+
+    def device(self) -> str:
+        return self.policy._device
+
+    def use_gpu(self) -> bool:
+        return self.policy._use_gpu
 
     def predict_action_probabilities(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
         assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"

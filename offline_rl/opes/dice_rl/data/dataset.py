@@ -229,7 +229,7 @@ class InitialStepRandomIterator(DiscountTransitionRandomIterator):
 
     def __init__(self, dataset: ProbabilityMDPDataset, batch_size: int,
                  gamma: float = 1.0,
-                 n_steps_per_epoch: int = 1000):
+                 n_steps_per_epoch: int = 10000):
         init_trans = []
 
         for ep in dataset.episodes:

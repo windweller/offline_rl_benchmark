@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import numpy as np
 from typing import Any, Callable, Iterable, Optional, Sequence, Tuple, Union, List
 
@@ -14,7 +15,7 @@ from offline_rl.opes.dice_rl.data.dataset import InitialStepRandomIterator, Step
     InitialStepRoundIterator
 
 from d3rlpy.torch_utility import TorchMiniBatch
-from d3rlpy.models.encoders import VectorEncoder, VectorEncoderWithAction
+from offline_rl.opes.dice_rl.networks.value_network import ValueNetwork, ValueNetworkWithAction
 from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
 
 ProbabilisticPolicy = Union[
@@ -23,11 +24,13 @@ ProbabilisticPolicy = Union[
 
 class NeuralDice(object):
     def __init__(self,
-                 nu_network: Union[VectorEncoder, VectorEncoderWithAction],
-                 zeta_network: Union[VectorEncoder, VectorEncoderWithAction],
-                 nu_optimizer: optim.Optimizer,
-                 zeta_optimizer: optim.Optimizer,
-                 lam_optimizer: optim.Optimizer,
+                 nu_network: Union[ValueNetwork, ValueNetworkWithAction],
+                 zeta_network: Union[ValueNetwork, ValueNetworkWithAction],
+                 nu_learning_rate: float,
+                 zeta_learning_rate: float,
+                 # nu_optimizer: optim.Optimizer,
+                 # zeta_optimizer: optim.Optimizer,
+                 # lam_optimizer: AdamFactory,
                  gamma: float,
                  has_log_probability: bool,
                  categorical_action: bool,
@@ -42,7 +45,8 @@ class NeuralDice(object):
                  nu_regularizer: float = 0.,
                  zeta_regularizer: float = 0.,
                  weight_by_gamma: bool = False,
-                 clip_lower: float = 1e-3, clip_upper: float = 1e3):
+                 clip_lower: float = 1e-3, clip_upper: float = 1e3,
+                 grad_clip=1):
         """Initializes the solver.
 
             Args:
@@ -78,9 +82,9 @@ class NeuralDice(object):
         self._zeta_network = zeta_network
         self._zero_reward = zero_reward
 
-        self._nu_optimizer = nu_optimizer
-        self._zeta_optimizer = zeta_optimizer
-        self._lam_optimizer = lam_optimizer
+        self._nu_optimizer = optim.Adam(nu_network.parameters(), lr=nu_learning_rate)
+        self._zeta_optimizer = optim.Adam(zeta_network.parameters(), lr=zeta_learning_rate)
+
         self._nu_regularizer = nu_regularizer
         self._zeta_regularizer = zeta_regularizer
         self._weight_by_gamma = weight_by_gamma
@@ -88,6 +92,7 @@ class NeuralDice(object):
         self._gamma = gamma
         self.clip_lower = clip_lower
         self.clip_upper = clip_upper
+        self.grad_clip = grad_clip
 
         self._categorical_action = categorical_action
         self._solve_for_state_action_ratio = solve_for_state_action_ratio
@@ -104,7 +109,9 @@ class NeuralDice(object):
         self._primal_regularizer = primal_regularizer
         self._dual_regularizer = dual_regularizer
         self._norm_regularizer = norm_regularizer
-        self._lam = torch.Tensor([0.])
+        self._lam = torch.tensor([0.], requires_grad=True)
+
+        self._lam_optimizer = optim.Adam([self._lam], lr=nu_learning_rate)
 
         if f_exponent <= 1:
             raise ValueError('Exponent for f must be greater than 1.')
@@ -112,14 +119,19 @@ class NeuralDice(object):
         self._f_fn = lambda x: torch.abs(x) ** f_exponent / f_exponent
         self._fstar_fn = lambda x: torch.abs(x) ** fstar_exponent / fstar_exponent
 
-    def tensor_to_gpu(self, batch: TransitionMiniBatchWithDiscount, device: str) -> TorchMiniBatch:
-        batch = TorchMiniBatch(batch.transitions, device=device)  # policy.device()
-        return batch
+    def tensor_to_gpu(self, batch: Union[TransitionMiniBatchWithDiscount,
+                   TransitionMiniBatch], device: str) -> TorchMiniBatch:
+        if type(batch) == TransitionMiniBatchWithDiscount:
+            batch: TransitionMiniBatchWithDiscount
+            new_batch = TorchMiniBatch(batch.transitions, device=device)  # policy.device()
+        else:
+            new_batch = TorchMiniBatch(batch, device=device)
+        return new_batch
 
     def np_to_th(self, array: np.ndarray, device: str) -> torch.Tensor:
         return torch.from_numpy(array).to(device)
 
-    def _get_value(self, network: Union[VectorEncoder, VectorEncoderWithAction],
+    def _get_value(self, network: Union[ValueNetwork, ValueNetworkWithAction],
                    env_step: Union[TransitionMiniBatchWithDiscount, TransitionMiniBatch], device: str) -> torch.Tensor:
         env_step = self.tensor_to_gpu(env_step, device)
         if self._solve_for_state_action_ratio:
@@ -128,7 +140,7 @@ class NeuralDice(object):
         else:
             return network(env_step.observations)
 
-    def _get_average_value(self, network: Union[VectorEncoder, VectorEncoderWithAction],
+    def _get_average_value(self, network: Union[ValueNetwork, ValueNetworkWithAction],
                            env_step: Union[TransitionMiniBatchWithDiscount, TransitionMiniBatch],
                            policy: Union[
                 DiscreteProbabilisticTorchPolicyProtocol, ContinuousProbabilisticPolicyProtocol]):
@@ -144,7 +156,7 @@ class NeuralDice(object):
                 actions = torch.ones(batch_size, 1) * torch.arange(num_actions)[None, :]
             else:
                 # here we need to sample...
-                # TODO: will do this...
+                # TODO: will do this...for continuous action
                 raise NotImplementedError
 
             flat_actions = torch.reshape(actions, [batch_size * num_actions] +
@@ -158,9 +170,10 @@ class NeuralDice(object):
             # predicted density ratios??
             # No, this is still just predicting values...hmmm
             # how the hell is this "solving for state-action density ratio"?
+            # TODO: I don't know why the shape change is here...
             flat_values = network(flat_observations, flat_actions)
-            values = torch.reshape(flat_values, [batch_size, num_actions] +
-                                   list(flat_values.shape[1:]))
+            values = torch.reshape(flat_values, [batch_size, num_actions])
+            # + list(flat_values.shape[1:]
 
             return torch.mean(values * actions_probs, dim=1, keepdim=True)
         else:
@@ -186,9 +199,10 @@ class NeuralDice(object):
         # numpy array still, need to lift to tensor...
         discounts = torch.from_numpy(self._gamma * next_env_step.discounts).to(target_policy.device())  # [batch_size]
         policy_ratio = 1.0
+        batch = self.tensor_to_gpu(env_step, target_policy.device())
         if not self._solve_for_state_action_ratio:
             # get log probability of policy, and logged probability from the dataset
-            batch = self.tensor_to_gpu(env_step, target_policy.device())
+            # batch = self.tensor_to_gpu(env_step, target_policy.device())
             policy_probabilities = target_policy.predict_action_probabilities(batch.observations)
             logged_probabilities = batch.actions
             policy_ratio = policy_probabilities / logged_probabilities
@@ -197,36 +211,37 @@ class NeuralDice(object):
         bellman_residuals = (discounts * policy_ratio).reshape(-1, 1) * next_nu_values - nu_values \
                             - self._norm_regularizer * self._lam
         if not self._zero_reward:
-            bellman_residuals += policy_ratio * env_step.transitions.rewards
+            bellman_residuals = bellman_residuals + policy_ratio * batch.rewards
 
         zeta_loss = -zeta_values * bellman_residuals
         nu_loss = (1 - self._gamma) * initial_nu_values
         lam_loss = self._norm_regularizer * self._lam
         if self._primal_form:
-            nu_loss += self._fstar_fn(bellman_residuals)
+            nu_loss = nu_loss + self._fstar_fn(bellman_residuals)
             lam_loss = lam_loss + self._fstar_fn(bellman_residuals)
         else:
-            nu_loss += zeta_values * bellman_residuals
+            nu_loss = nu_loss + zeta_values * bellman_residuals
             lam_loss = lam_loss - self._norm_regularizer * zeta_values * self._lam
 
-        nu_loss += self._primal_regularizer * self._f_fn(nu_values)
-        zeta_loss += self._dual_regularizer * self._f_fn(zeta_values)
+        nu_loss = nu_loss + self._primal_regularizer * self._f_fn(nu_values)
+        zeta_loss = zeta_loss + self._dual_regularizer * self._f_fn(zeta_values)
 
         if self._weight_by_gamma:
             # TODO: I'm not sure why they do this line:
             # weights = self._gamma**tf.cast(env_step.step_num, tf.float32)[:, None]
             weights = torch.from_numpy(env_step.discounts).to(target_policy.device())
             weights /= 1e-6 + torch.mean(discounts)
-            nu_loss *= weights
-            zeta_loss *= weights
+            nu_loss = nu_loss * weights
+            zeta_loss = zeta_loss * weights
 
         return nu_loss, zeta_loss, lam_loss
 
-    def _orthogonal_regularization(self, encoder: Union[VectorEncoder, VectorEncoderWithAction]):
+    def _orthogonal_regularization(self, encoder: Union[ValueNetwork, ValueNetworkWithAction]):
         reg = 0
-        for linear_layer in encoder._fcs:
-            prod = torch.matmul(torch.transpose(linear_layer.weight, 0, 1), linear_layer.weight)
-            reg += torch.sum(torch.square(prod * (1 - torch.eye(prod.shape[0]))))
+        for layer in encoder._layers:
+            if type(layer) == nn.Linear:
+                prod = torch.matmul(torch.transpose(layer.weight, 0, 1), layer.weight)
+                reg = reg + torch.sum(torch.square(prod * (1 - torch.eye(prod.shape[0]))))
         return reg
 
     def train_step(self, initial_env_step: TransitionMiniBatchWithDiscount,
@@ -236,25 +251,27 @@ class NeuralDice(object):
         nu_loss, zeta_loss, lam_loss = self.train_loss(initial_env_step, env_step,
                                                        next_env_step,
                                                        target_policy)
-        nu_loss += self._nu_regularizer * self._orthogonal_regularization(
+        nu_loss = nu_loss + self._nu_regularizer * self._orthogonal_regularization(
             self._nu_network)
-        zeta_loss += self._zeta_regularizer * self._orthogonal_regularization(
+        zeta_loss = zeta_loss + self._zeta_regularizer * self._orthogonal_regularization(
             self._zeta_network)
 
-        # I'm a bit concerned with the gradient computation here....
+        with torch.autograd.set_detect_anomaly(True):
+            self._nu_optimizer.zero_grad()
+            self._zeta_optimizer.zero_grad()
+            self._lam_optimizer.zero_grad()
 
-        # self._nu_optimizer only contains parameters in self._nu_network
-        self._nu_optimizer.zero_grad()
-        nu_loss.mean().backward()
-        self._nu_optimizer.step()
+            nu_loss.mean().backward(retain_graph=True, inputs=list(self._nu_network.parameters()))
+            torch.nn.utils.clip_grad_norm_(self._nu_network.parameters(), self.grad_clip)
+            self._nu_optimizer.step()
 
-        self._zeta_optimizer.zero_grad()
-        zeta_loss.mean().backward()
-        self._zeta_optimizer.step()
+            zeta_loss.mean().backward(retain_graph=True, inputs=list(self._zeta_network.parameters()))
+            torch.nn.utils.clip_grad_norm_(self._zeta_network.parameters(), self.grad_clip)
+            self._zeta_optimizer.step()
 
-        self._lam_optimizer.zero_grad()
-        lam_loss.mean().backward()
-        self._lam_optimizer.step()
+            lam_loss.mean().backward(inputs=[self._lam])
+            torch.nn.utils.clip_grad_norm_(self._lam, self.grad_clip)
+            self._lam_optimizer.step()
 
         return (torch.mean(nu_loss), torch.mean(zeta_loss), torch.mean(lam_loss))
 
@@ -275,7 +292,7 @@ class NeuralDice(object):
         raise Exception("This is not needed for getting average reward estimate, we will implement this later...")
 
     def estimate_average_reward(self, dataset: ProbabilityMDPDataset,
-                                target_policy: ProbabilisticPolicy, batch_size: int):
+                                target_policy: ProbabilisticPolicy):
         # actually quite simple, just need to get zeta (weight)
         # and just compute E[zeta * reward]
         def weight_fn(env_step: TransitionMiniBatchWithDiscount):

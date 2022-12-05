@@ -63,10 +63,10 @@ class QLearningEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
         self.policy_impl: DQNImpl = dqn._impl
 
     def device(self) -> str:
-        return self.policy._device
+        return self.policy._use_gpu
 
     def use_gpu(self) -> bool:
-        return self.policy._use_gpu
+        return bool(self.policy._use_gpu)
 
     def predict_action_probabilities(self, state: np.ndarray) -> np.ndarray:
         assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"
@@ -83,7 +83,7 @@ class QLearningEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
         return action_prob.detach().numpy()
 
 
-class DiscreteQLearningTorchWrapperDiscrete(DiscreteProbabilisticTorchPolicyProtocol):
+class DiscreteQLearningTorchWrapper(DiscreteProbabilisticTorchPolicyProtocol):
     r"""QLearningWrapper
     This wrapper handles state as torch input.
     """
@@ -97,6 +97,12 @@ class DiscreteQLearningTorchWrapperDiscrete(DiscreteProbabilisticTorchPolicyProt
         """
         self.policy = dqn
         self.policy_impl: DQNImpl = dqn._impl
+
+    def device(self) -> str:
+        return self.policy._use_gpu
+
+    def use_gpu(self) -> bool:
+        return bool(self.policy._use_gpu)
 
     def predict_action_probabilities(self, state: torch.Tensor) -> torch.Tensor:
         assert len(state.shape) == 2, "cannot pass in a single state, needs to be batched"

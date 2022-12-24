@@ -17,7 +17,7 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'offline_rl_benchmark'
+project = 'Offline RL Library'
 copyright = '2022, Allen Nie, Yannis Flet-Berliac'
 author = 'Allen Nie, Yannis Flet-Berliac'
 

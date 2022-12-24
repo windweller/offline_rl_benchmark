@@ -6,7 +6,7 @@ but currently we use CQL isntead
 from d3rlpy.algos import DQN, DiscreteCQL
 from d3rlpy.ope import DiscreteFQE
 from offline_rl.envs.datasets import get_tutorbot
-from offline_rl.algs.policy_evaluation_wrappers import QLearningEvaluationWrapper
+from offline_rl.algs.policy_evaluation_wrappers import DiscreteCQLEvaluationWrapper
 from offline_rl.envs.tutorbot.env import evaluate_on_tutorbot_environment
 from sklearn.model_selection import train_test_split
 

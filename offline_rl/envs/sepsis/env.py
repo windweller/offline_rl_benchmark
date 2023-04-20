@@ -81,10 +81,10 @@ class Sepsis(gym.Env, CSVDataset):
         """
         if self.env_name == 'mdp':
             self.observation_space = gym.spaces.Box(low=np.array([0., 0, 0, 0, 0, 0, 0, 0]).astype('float32'),
-                                                    high=np.array([3., 3, 5, 2, 2, 2, 2, 2]).astype('float32'))
+                                                    high=np.array([3., 3, 5, 2, 2, 2, 2, 1]).astype('float32'))
         elif self.env_name == 'pomdp':
             self.observation_space = gym.spaces.Box(low=np.array([0., 0, 0, 0, 0, 0]).astype('float32'),
-                                                    high=np.array([3., 3, 2, 2, 2, 2]).astype('float32'))
+                                                    high=np.array([3., 3, 2, 2, 2, 1]).astype('float32'))
         else:
             raise Exception("Unknown environment name")
 
@@ -124,7 +124,7 @@ class Sepsis(gym.Env, CSVDataset):
         raise NotImplementedError
 
 def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
-                        prep_for_is_ope=False) -> ProbabilityMDPDataset:
+                        prep_for_is_ope=False, traj_weight=None) -> ProbabilityMDPDataset:
     """
     Load the sepsis dataset
     :param df: the dataframe to load
@@ -132,6 +132,7 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
                             we need to directly add action probabilities to action (pretend it's a multi-dim continuous action space).
                             This will later be used by our OPE class to compute IS OPE.
                             However, if we flag is True and try to learn a discrete control policy (or FQE), it will fail.
+    :param traj_weight: the weight of each trajectory, used for reward reweighting (e.g., for sample-efficient bootstrap)
     :return:
     """
     features_list = []
@@ -140,18 +141,29 @@ def load_sepsis_dataset(df: pd.DataFrame, env: Sepsis,
     rewards_list = []
     terminals_list = []
 
+    idx = 0
     for group_name, df_group in df.groupby(env.get_trajectory_marking_name()):
         features = df_group[env.get_feature_names()].to_numpy().astype(float)
         actions_prob = df_group[env.get_action_names()].to_numpy().astype(float)
         actions = df_group[env.get_action_names()].to_numpy().argmax(axis=1).astype(float)
         rewards = df_group[env.get_reward_name()].to_numpy().astype(float)
-        terminals = np.array((rewards.shape[0] - 1) * [0.] + [1.]).astype(float)  # 1 is terminal state
+        terminal_idx = rewards.nonzero()[0]
 
-        features_list.append(features)
-        actions_list.append(actions)
-        actions_prob_list.append(actions_prob)
-        rewards_list.append(rewards)
-        terminals_list.append(terminals)
+        if traj_weight is not None:
+            rewards *= traj_weight[idx]
+            idx += 1
+
+        if len(terminal_idx) == 0:
+            terminal_idx = rewards.shape[0] - 2  # -2 because the last action is [-1, -1, ..., -1]
+
+        terminals = np.array((rewards.shape[0]) * [0.]).astype(float)  # 1 is terminal state
+        terminals[terminal_idx] = 1
+
+        features_list.append(features[:int(terminal_idx)+1, :])
+        actions_list.append(actions[:int(terminal_idx)+1])
+        actions_prob_list.append(actions_prob[:int(terminal_idx)+1, :])
+        rewards_list.append(rewards[:int(terminal_idx)+1])
+        terminals_list.append(terminals[:int(terminal_idx)+1])
 
     features = np.concatenate(features_list, axis=0)
     actions = np.concatenate(actions_list, axis=0)

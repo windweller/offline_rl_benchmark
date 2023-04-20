@@ -20,7 +20,7 @@ from d3rlpy.dataset import MDPDataset
 from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
 
 from offline_rl.envs.dataset import ProbabilityMDPDataset
-from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteBCEvaluationWrapper, BCEvaluationWrapper
+from offline_rl.algs.policy_evaluation_wrappers import DiscreteBCEvaluationWrapper, BCEvaluationWrapper
 
 
 class RegressionIS(object):

@@ -1,5 +1,6 @@
-from d3rlpy.dataset import MDPDataset
+from d3rlpy.dataset import MDPDataset, Transition, Episode
 import numpy as np
+from typing import List, Tuple, Iterator
 
 class CSVDataset(object):
     """
@@ -87,3 +88,136 @@ def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> Proba
     new_dataset.is_observed_action_discrete = dataset.is_observed_action_discrete
 
     return new_dataset
+
+class TransitionMiniBatch:
+    _transitions: List[Transition]
+    _observations: np.ndarray
+    _actions: np.ndarray
+    _rewards: np.ndarray
+    _next_observations: np.ndarray
+    _terminals: np.ndarray
+    _n_steps: np.ndarray
+
+    def __init__(self, transitions: List[Transition], n_frames: int, n_steps=1):
+        self._transitions = transitions
+
+        self._transitions = transitions
+        observation_shape = transitions[0].get_observation_shape()
+        observation_ndim = len(observation_shape)
+        observation_dtype = transitions[0].observation.dtype
+
+        # determine action shape
+        action_size = transitions[0].get_action_size()
+        action_shape = tuple()
+        action_dtype = np.int32
+        if isinstance(transitions[0].action, np.ndarray):
+            action_shape = (action_size,)
+            action_dtype = np.float32
+
+        size = len(transitions)
+
+        self._observations = np.empty(
+            (size,) + observation_shape, dtype=observation_dtype
+        )
+        self._actions = np.empty((size,) + action_shape, dtype=action_dtype)
+        self._rewards = np.empty((size, 1), dtype=np.float32)
+        self._next_observations = np.empty(
+            (size,) + observation_shape, dtype=observation_dtype
+        )
+        self._terminals = np.empty((size, 1), dtype=np.float32)
+        self._n_steps = np.empty((size, 1), dtype=np.float32)
+
+        for i, transition in enumerate(transitions):
+            self._observations[i] = transition.observation
+            self._actions[i] = transition.action
+            self._rewards[i] = transition.reward
+            self._next_observations[i] = transition.next_observation
+            self._terminals[i] = transition.terminal
+            self._n_steps[i] = 1
+
+    @property
+    def observations(self):
+        """ Returns mini-batch of observations at `t`.
+        Returns:
+            numpy.ndarray or torch.Tensor: observations at `t`.
+        """
+        return self._observations
+
+    @property
+    def actions(self):
+        """ Returns mini-batch of actions at `t`.
+        Returns:
+            numpy.ndarray: actions at `t`.
+        """
+        return self._actions
+
+    @property
+    def rewards(self):
+        """ Returns mini-batch of rewards at `t`.
+        Returns:
+            numpy.ndarray: rewards at `t`.
+        """
+        return self._rewards
+
+    @property
+    def next_observations(self):
+        """ Returns mini-batch of observations at `t+n`.
+        Returns:
+            numpy.ndarray or torch.Tensor: observations at `t+n`.
+        """
+        return self._next_observations
+
+    @property
+    def terminals(self):
+        """ Returns mini-batch of terminal flags at `t+n`.
+        Returns:
+            numpy.ndarray: terminal flags at `t+n`.
+        """
+        return self._terminals
+
+    @property
+    def n_steps(self):
+        """ Returns mini-batch of the number of steps before next observations.
+        This will always include only ones if ``n_steps=1``. If ``n_steps`` is
+        bigger than ``1``. the values will depend on its episode length.
+        Returns:
+            numpy.ndarray: the number of steps before next observations.
+        """
+        return self._n_steps
+
+    @property
+    def transitions(self):
+        """ Returns transitions.
+        Returns:
+            d3rlpy.dataset.Transition: list of transitions.
+        """
+        return self._transitions
+
+    def size(self):
+        """ Returns size of mini-batch.
+        Returns:
+            int: mini-batch size.
+        """
+        return len(self._transitions)
+
+    def __len__(self):
+        return self.size()
+
+    def __getitem__(self, index):
+        return self._transitions[index]
+
+    def __iter__(self):
+        return iter(self._transitions)
+
+def _make_batches(
+    episode: Episode, window_size: int, n_frames: int
+) -> Iterator[TransitionMiniBatch]:
+    n_batches = len(episode) // window_size
+    if len(episode) % window_size != 0:
+        n_batches += 1
+    for i in range(n_batches):
+        head_index = i * window_size
+        last_index = min(head_index + window_size, len(episode))
+        transitions = episode.transitions[head_index:last_index]
+        batch = TransitionMiniBatch(transitions, n_frames)
+        yield batch

@@ -13,8 +13,9 @@ import numpy as np
 import torch
 
 from d3rlpy.dataset import Episode, Transition
-from d3rlpy.metrics.scorer import _make_batches, WINDOW_SIZE
-from offline_rl.algs.discrete_policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
+from d3rlpy.metrics.scorer import WINDOW_SIZE
+from offline_rl.envs.dataset import _make_batches
+from offline_rl.algs.policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
 def check_if_action_is_proper_probability(transition: Transition):
     assert type(transition.action) != np.int32, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
@@ -32,7 +33,7 @@ def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np
     for i in range(n):
         last = 1
         for t in range(int(length[i])):
-            assert pibs[i, t] != 0
+            assert pibs[i, t] != 0, print(pibs[i])
             last = last * (pies[i, t] / pibs[i, t])
             weights[i, t] = last
         weights[i, int(length[i]):] = weights[i, int(length[i]) - 1]
@@ -69,7 +70,6 @@ def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length:
         weighted_r = (rewards * weights).sum(axis=0)
         # step 2: (\sum_n r_nt * w_nt) / \sum_n w_nt
         score = weighted_r / weights_norm
-
         # step 3: \sum_t ((\sum_n r_nt * w_nt) / \sum_n w_nt)
         score = score.sum()
     else:

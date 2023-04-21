@@ -1,12 +1,15 @@
 from d3rlpy.dataset import MDPDataset, Transition, Episode
 import numpy as np
 from typing import List, Tuple, Iterator
+import gym
+
 
 class CSVDataset(object):
     """
     When the offline RL dataset is in the CSV format
     We provide column names so that pandas library can better process
     """
+
     def get_feature_names(self):
         raise Exception
 
@@ -36,6 +39,7 @@ class ProbabilityMDPDataset(MDPDataset):
     # because we need to flag is_discrete to store continuous probabilities
     is_observed_action_discrete: bool
 
+
 def convert_dataset_for_is_ope(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
     """
     Convert the dataset to be used for IS OPE
@@ -59,6 +63,7 @@ def convert_dataset_for_is_ope(dataset: ProbabilityMDPDataset) -> ProbabilityMDP
     new_dataset.observed_actions = dataset.observed_actions
     new_dataset.is_observed_action_discrete = dataset.is_observed_action_discrete
     return new_dataset
+
 
 def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> ProbabilityMDPDataset:
     """
@@ -88,6 +93,7 @@ def convert_is_ope_dataset_for_training(dataset: ProbabilityMDPDataset) -> Proba
     new_dataset.is_observed_action_discrete = dataset.is_observed_action_discrete
 
     return new_dataset
+
 
 class TransitionMiniBatch:
     _transitions: List[Transition]
@@ -209,8 +215,9 @@ class TransitionMiniBatch:
     def __iter__(self):
         return iter(self._transitions)
 
+
 def _make_batches(
-    episode: Episode, window_size: int, n_frames: int
+        episode: Episode, window_size: int, n_frames: int
 ) -> Iterator[TransitionMiniBatch]:
     n_batches = len(episode) // window_size
     if len(episode) % window_size != 0:
@@ -221,3 +228,69 @@ def _make_batches(
         transitions = episode.transitions[head_index:last_index]
         batch = TransitionMiniBatch(transitions, n_frames)
         yield batch
+
+# ===== The following two functions work with any D3rlpy MDPDataset =====
+# They have been tested to be able to recreate the same dataset
+# And is generally efficient
+
+def episodes_to_MDPDataset(episodes: List[Episode], env: gym.Env) -> MDPDataset:
+    # first iteration to determine shape
+
+    size = sum(ep.size() + 1 for ep in episodes)
+    observation_dim = env.observation_space.shape[0]
+    # this only works with discrete action space
+    # action_dim = env.action_space.n
+
+    observations = np.zeros((size, observation_dim))
+    actions = np.zeros((size))
+    rewards = np.zeros(size)
+    terminals = np.zeros(size)
+    episode_terminals = np.zeros(size)
+
+    prev_i = 0
+    for ep in episodes:
+        actual_size = ep.observations.shape[0]
+        observations[prev_i:prev_i + ep.observations.shape[0]] = ep.observations
+        actions[prev_i:prev_i + ep.rewards.shape[0]] = ep.actions
+        rewards[prev_i:prev_i + ep.rewards.shape[0]] = ep.rewards
+        ep_terminals = np.zeros(ep.rewards.shape[0])
+        ep_terminals[-1] = 1.
+        episode_terminals[prev_i:prev_i + ep.rewards.shape[0]] = ep_terminals
+
+        ep_terminals = np.zeros(actual_size)
+        ep_terminals[-1] = int(ep.terminal)
+        terminals[prev_i:prev_i + ep.rewards.shape[0]] = ep_terminals
+        prev_i += actual_size
+
+    return MDPDataset(observations=observations,
+                      actions=actions,
+                      rewards=rewards,
+                      terminals=terminals,
+                      episode_terminals=episode_terminals)
+
+
+def sample_bootstrap(episodes: List[Episode], env: gym.Env,
+                     n_copies=100, k_prop=0.7) -> Tuple[List[MDPDataset], float]:
+    """
+    We do n/k sample, where k < n
+    But in argument, we set a proportion: k_prop so that k is dynamic
+
+    :param episodes:
+    :param env:
+    :param n_copies:
+    :param k_prop:
+    :return: a list of MDPDataset, and the ratio of n/k
+    """
+
+    datasets = []
+    # traj_dist = np.zeros(len(episodes))  # this is for efficient bootstrap
+    k = int(len(episodes) * k_prop)
+    indices = np.arange(len(episodes))
+    for i in range(n_copies):
+        # sample with replacement
+        sampled_indices = np.random.choice(indices, k, replace=True)
+        sampled_episodes = [episodes[i] for i in sampled_indices]
+        dataset = episodes_to_MDPDataset(sampled_episodes, env)
+        datasets.append(dataset)
+
+    return datasets, len(episodes) / k

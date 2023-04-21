@@ -1,1 +1,2 @@
 pymdptoolbox
+gym=0.17.2

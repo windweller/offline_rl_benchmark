@@ -64,6 +64,7 @@ def get_sepsis(env_name: str) -> Tuple[ProbabilityMDPDataset, Sepsis]:
 
     return dataset, env
 
+
 def get_sepsis_weighted(env_name: str, traj_weight: np.array) -> Tuple[ProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
@@ -90,6 +91,7 @@ def get_sepsis_weighted(env_name: str, traj_weight: np.array) -> Tuple[Probabili
     dataset = load_sepsis_dataset(data, env, traj_weight=traj_weight)
 
     return dataset, env
+
 
 def create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, traj_name, env):
     datasets = []
@@ -384,6 +386,7 @@ def combine_sepsis_ensemble_datasets(env_name: str, datasets: List[pd.DataFrame]
 
     return dataset, env
 
+
 # ===== Sepsis Population ======
 
 SEPSIS_POP_URL = f"{GITHUB_URL}/StanfordAI4HI/Split-select-retrain/raw/main/envs/sepsis/ens_ope_pop.zip"
@@ -394,6 +397,7 @@ SEPSIS_POP_ENVS = [
     'pomdp-1000',
     'mdp-1000'
 ]
+
 
 def get_sepsis_population_full(env_name: str) -> Tuple[List[ProbabilityMDPDataset], Sepsis]:
     """

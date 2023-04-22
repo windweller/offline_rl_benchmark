@@ -23,8 +23,7 @@ def train_online_collection_poilcy(epochs, dataset_name, save_dir):
         batch_size=128,
         learning_rate=0.00063,
         target_update_interval=250,
-        use_gpu=False,
-    )
+        use_gpu=False)
 
     # experience replay buffer
     buffer = d3rlpy.online.buffers.ReplayBuffer(maxlen=100000, env=env)

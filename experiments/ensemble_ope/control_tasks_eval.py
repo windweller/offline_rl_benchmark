@@ -18,20 +18,39 @@ import cvxpy as cp
 
 from offline_rl.envs.dataset import sample_bootstrap
 
+def get_dataset(dataset_name, save_dir):
+    assert dataset_name in ['cartpole-replay', 'cartpole-random', 'acrobot-replay', 'acrobot-random']
 
-def load_in_control_policies(poilcy_dir: str, env: gym.Env, dataset: MDPDataset):
+    if 'acrobot' not in dataset_name:
+        dataset, env = d3rlpy.datasets.get_dataset(dataset_name)
+    else:
+        # we load in differently
+        if 'replay' in dataset_name:
+            data_path = os.path.join(save_dir, 'acrobot_v1_replay_dataset.h5')
+        else:
+            data_path = os.path.join(save_dir, 'acrobot_v1_random_dataset.h5')
+        dataset = MDPDataset.load(data_path)
+        env = gym.make('Acrobot-v1')
+
+    return dataset, env
+
+def load_in_control_policies(poilcy_dir: str, dataset_name: str, save_dir: str):
     """
     We assume policy_dir contains policy.pt files
     We would load in and evaluate their online performance
     :param poilcy_dir:
     :return:
     """
+    dataset, env = get_dataset(dataset_name, save_dir)
     evaluate_scorer = evaluate_on_environment(env)
 
     policies_w_perf = []
     for f in os.listdir(poilcy_dir):
         if f.endswith('.pt'):
-            bcq = DiscreteBCQ()
+            if 'acrobot' not in dataset_name:
+                bcq = DiscreteBCQ()
+            else:
+                bcq = DQN()
             bcq.build_with_dataset(dataset)
             bcq.load_model(os.path.join(poilcy_dir, f))
             policies_w_perf.append((bcq, evaluate_scorer(bcq)))
@@ -48,8 +67,9 @@ fqe_configs = [1, 3, 5, 7, 9]
 def create_mse_matrix(policy, dataset_name, save_dir):
     print("Running ensemble performance")
 
-    assert dataset_name in ['cartpole-replay', 'cartpole-random']
-    dataset, env = d3rlpy.datasets.get_dataset(dataset_name)
+    assert dataset_name in ['cartpole-replay', 'cartpole-random', 'acrobot-replay', 'acrobot-random']
+    # dataset, env = d3rlpy.datasets.get_dataset(dataset_name)
+    dataset, env = get_dataset(dataset_name, save_dir)
 
     _, eval_episodes = train_test_split(dataset, test_size=0.5, random_state=42)
 
@@ -122,8 +142,9 @@ def solve_for_alpha(ope_biases: np.array, ope_mses: np.array, ope_scores: np.arr
 def run_experiment(policy_dir: str, dataset_name: str, save_dir: str):
     print("Running ensemble performance")
 
-    assert dataset_name in ['cartpole-replay', 'cartpole-random']
-    dataset, env = d3rlpy.datasets.get_dataset(dataset_name)
+    # assert dataset_name in ['cartpole-replay', 'cartpole-random', 'acrobot-replay', 'acrobot-random']
+    # dataset, env = d3rlpy.datasets.get_dataset(dataset_name)
+    dataset, env = get_dataset(dataset_name, save_dir)
 
     alpha_mat = []
     alpha_names = [f'alpha_fqe{i}' for i in range(len(fqe_configs))]
@@ -141,7 +162,7 @@ def run_experiment(policy_dir: str, dataset_name: str, save_dir: str):
     mse_mat = []
     mse_names = [f'mse_fqe{i}' for i in range(len(fqe_configs))] + ['mse_ope_ensemble']
 
-    policies, policy_perfs = load_in_control_policies(policy_dir, env, dataset)
+    policies, policy_perfs = load_in_control_policies(policy_dir, dataset_name, save_dir)
     n_copies = 10
 
     for i in tqdm(range(len(policies))):
@@ -187,4 +208,5 @@ def run_experiment(policy_dir: str, dataset_name: str, save_dir: str):
 
 
 if __name__ == '__main__':
-    run_experiment("model_logs/cartpole_policies", "cartpole-replay", "model_logs")
+    # run_experiment("model_logs/cartpole_policies", "cartpole-replay", "model_logs")
+    run_experiment("model_logs/acrobot_policies", "acrobot-replay", "model_logs")

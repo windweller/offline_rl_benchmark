@@ -4,6 +4,7 @@ test.py
 *.csv
 d3rlpy_logs
 offline_rl_data
+*.txt
 
 ### JetBrains template
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider

@@ -270,7 +270,7 @@ def episodes_to_MDPDataset(episodes: List[Episode], env: gym.Env) -> MDPDataset:
 
 
 def sample_bootstrap(episodes: List[Episode], env: gym.Env,
-                     n_copies=100, k_prop=0.7) -> Tuple[List[MDPDataset], float]:
+                     n_copies=100, k_prop=0.2) -> Tuple[List[MDPDataset], float]:
     """
     We do n/k sample, where k < n
     But in argument, we set a proportion: k_prop so that k is dynamic
@@ -293,4 +293,4 @@ def sample_bootstrap(episodes: List[Episode], env: gym.Env,
         dataset = episodes_to_MDPDataset(sampled_episodes, env)
         datasets.append(dataset)
 
-    return datasets, len(episodes) / k
+    return datasets, k / len(episodes)

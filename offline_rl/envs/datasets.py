@@ -115,7 +115,7 @@ def create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, 
     return datasets, traj_dist
 
 
-def get_sepsis_boostrap_copies(env_name: str, num_copies: int) -> Tuple[List[ProbabilityMDPDataset], Sepsis, np.array]:
+def get_sepsis_boostrap_copies(env_name: str, num_copies: int, k_prop: float=0.2) -> Tuple[List[ProbabilityMDPDataset], Sepsis, np.array, float]:
     """
     :param env_name: dataset size
     :param num_copies: number of copies of the dataset
@@ -123,6 +123,7 @@ def get_sepsis_boostrap_copies(env_name: str, num_copies: int) -> Tuple[List[Pro
         List[ProbabilityMDPDataset]: list of datasets
         Sepsis: environment
         np.array: trajectory distribution (how many times a trajectory is sampled in our procedure)
+        float: scale ratio
     """
     assert env_name in SEPSIS_ENVS, print("available env names are: ", SEPSIS_ENVS)
 
@@ -148,12 +149,13 @@ def get_sepsis_boostrap_copies(env_name: str, num_copies: int) -> Tuple[List[Pro
     for unique_traj in data[traj_name].unique():
         patient_subdatasets.append(data[data[traj_name] == unique_traj])
 
-    total_patient_num = len(patient_subdatasets)
+    # k samples in each bootstrap
+    total_patient_num = int(len(patient_subdatasets) * k_prop)
     indices = np.arange(total_patient_num)
 
     datasets, traj_dist = create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, traj_name, env)
 
-    return datasets, env, traj_dist
+    return datasets, env, traj_dist, total_patient_num / len(patient_subdatasets)
 
 
 def get_sepsis_subsample_copies(env_name: str, num_copies: int, percentage: float = 0.5) -> Tuple[

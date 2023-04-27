@@ -22,7 +22,8 @@ def check_if_action_is_proper_probability(transition: Transition):
     assert np.abs(np.sum(transition.action) - 1) < 1e-6, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
 
 def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np.ndarray, max_time: int,
-             no_weight_norm: bool=False, clip_lower: float=1e-16, clip_upper: float=1e3) -> Tuple[float, np.ndarray]:
+             no_weight_norm: bool=False, clip_lower: float=1e-16, clip_upper: float=1e3,
+             no_clip=False) -> Tuple[float, np.ndarray]:
     """
     Private function used by the scorer
     :return:
@@ -37,7 +38,8 @@ def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np
             last = last * (pies[i, t] / pibs[i, t])
             weights[i, t] = last
         weights[i, int(length[i]):] = weights[i, int(length[i]) - 1]
-    weights = np.clip(weights, clip_lower, clip_upper)
+    if not no_clip:
+        weights = np.clip(weights, clip_lower, clip_upper)
     if not no_weight_norm:
         weights_norm = weights.sum(axis=0)
         weights /= weights_norm  # per-step weights (it's cumulative)
@@ -112,7 +114,7 @@ def compute_pib_pie(algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Ep
 
 def importance_sampling_scorer(
     algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
-    clip_lower: float=1e-16, clip_upper: float=1e3
+    clip_lower: float=1e-16, clip_upper: float=1e3, no_clip=False
 ) -> float:
     """
     :param algo:
@@ -126,13 +128,13 @@ def importance_sampling_scorer(
     check_if_action_is_proper_probability(episodes[0].transitions[0])
     pibs, pies, rewards, lengths, max_t = compute_pib_pie(algo, episodes)
     score, weights = _wis_ope(pibs, pies, rewards, lengths, max_t, no_weight_norm=True,
-                              clip_lower=clip_lower, clip_upper=clip_upper)
+                              clip_lower=clip_lower, clip_upper=clip_upper, no_clip=no_clip)
 
     return score
 
 def wis_scorer(
     algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
-    clip_lower: float=1e-16, clip_upper: float=1e3
+    clip_lower: float=1e-16, clip_upper: float=1e3, no_clip=False
 ) -> float:
     """
     :param algo:
@@ -144,7 +146,7 @@ def wis_scorer(
     check_if_action_is_proper_probability(episodes[0].transitions[0])
     pibs, pies, rewards, lengths, max_t = compute_pib_pie(algo, episodes)
     score, weights = _wis_ope(pibs, pies, rewards, lengths, max_t, no_weight_norm=False,
-                              clip_lower=clip_lower, clip_upper=clip_upper)
+                              clip_lower=clip_lower, clip_upper=clip_upper, no_clip=no_clip)
 
     return score
 

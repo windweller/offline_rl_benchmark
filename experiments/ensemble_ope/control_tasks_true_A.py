@@ -157,7 +157,7 @@ def solve_for_alpha(ope_scores, error_matrix_A):
     return alpha, score
 
 
-def run_experiment(policy_dir: str, dataset_name: str, save_dir: str, n_copies=10):
+def run_experiment(policy_dir: str, dataset_name: str, save_dir: str, load_first=10):
     print("Running ensemble performance")
 
     # assert dataset_name in ['cartpole-replay', 'cartpole-random', 'acrobot-replay', 'acrobot-random']
@@ -196,9 +196,9 @@ def run_experiment(policy_dir: str, dataset_name: str, save_dir: str, n_copies=1
         ope_row.append(true_perf)
 
         ope_scores, ope_bootstrapped_scores, est_bias, est_variance,  ope_mse, error_matrix_A = create_mse_matrix(policies[i], dataset_name,
-                                                                                      save_dir, num_bootstrap=n_copies)
+                                                                                                                  save_dir, num_bootstrap=load_first)
 
-        np.savez(f"control_tasks_results/policy_{i}_{dataset_name}_{n_copies}_ope_subsampled_scores.npz",
+        np.savez(f"control_tasks_results/policy_{i}_{dataset_name}_{load_first}_ope_subsampled_scores.npz",
                  ope_bootstrapped_scores=ope_bootstrapped_scores, ope_scores=ope_scores)
 
         alphas, score = solve_for_alpha(ope_scores, error_matrix_A)
@@ -226,13 +226,13 @@ def run_experiment(policy_dir: str, dataset_name: str, save_dir: str, n_copies=1
     mse_mat = pd.DataFrame(mse_mat, columns=mse_names)
     mse_est = pd.DataFrame(sampled_ope_mse, columns=sampled_ope_mse_name)
 
-    opes_mat.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_opes_mat.csv')
-    alpha_mat.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_alpha_mat.csv')
-    sampled_ope_biases_mat.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_sampled_ope_biases_mat.csv')
-    sampled_ope_variances_mat.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_sampled_ope_variances_mat.csv')
+    opes_mat.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_opes_mat.csv')
+    alpha_mat.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_alpha_mat.csv')
+    sampled_ope_biases_mat.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_sampled_ope_biases_mat.csv')
+    sampled_ope_variances_mat.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_sampled_ope_variances_mat.csv')
     # real_ope_biases_mat.to_csv(f'results/{dataset_name}_{n_copies}_real_ope_biases_mat.csv')
-    mse_mat.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_mse_mat.csv')
-    mse_est.to_csv(f'control_tasks_results/{dataset_name}_{n_copies}_mse_est.csv')
+    mse_mat.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_mse_mat.csv')
+    mse_est.to_csv(f'control_tasks_results/{dataset_name}_{load_first}_mse_est.csv')
 
 
 if __name__ == '__main__':
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--policy_dir', type=str, default='model_logs/cartpole_policies')
     args = parser.parse_args()
 
-    run_experiment(args.policy_dir, args.dataset, args.save_dir, n_copies=5)
+    run_experiment(args.policy_dir, args.dataset, args.save_dir, load_first=20)
 
     # run_experiment("model_logs/cartpole_policies", "cartpole-replay", "model_logs")
     # run_experiment("model_logs/cartpole_policies", "cartpole-random", "model_logs")

@@ -401,12 +401,15 @@ SEPSIS_POP_ENVS = [
 ]
 
 
-def get_sepsis_population_full(env_name: str) -> Tuple[List[ProbabilityMDPDataset], Sepsis]:
+def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[List[ProbabilityMDPDataset],
+                                                                               ProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
     :return:
     """
     assert env_name in SEPSIS_POP_ENVS, print("available env names are: ", SEPSIS_POP_ENVS)
+
+    assert load_first_n <= 100, print("load_first_n must be <= 100, we only have 100 datasets in total")
 
     noise = '005'
 
@@ -426,11 +429,16 @@ def get_sepsis_population_full(env_name: str) -> Tuple[List[ProbabilityMDPDatase
     appendage = '_full_states' if mdp_type == 'mdp' else ''
 
     datasets = []
-    for pop_idx in range(100):
+    dfs = []
+    for pop_idx in range(load_first_n):
         filepath = f"{DATA_DIRECTORY}/ens_ope_pop/ens_ope_marginalized_sepsis_{data_size}_w_noise_{noise}_pop_{pop_idx}" + appendage + ".csv"
         data = pd.read_csv(filepath)
 
         dataset = load_sepsis_dataset(data, env)
         datasets.append(dataset)
+        dfs.append(data)
 
-    return datasets, env
+    data = pd.concat(dfs)
+    dataset = load_sepsis_dataset(data, env)
+
+    return datasets, dataset, env

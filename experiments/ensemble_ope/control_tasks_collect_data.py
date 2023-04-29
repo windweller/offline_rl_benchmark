@@ -84,15 +84,39 @@ def collect_dataset(save_dir):
     # save MDPDataset
     dataset.dump(os.path.join(save_dir, "acrobot_v1_random_dataset.h5"))
 
+def collect_n_datasets(save_dir, env_name, n=20):
+    from tqdm import tqdm
+
+    env = gym.make(env_name)
+
+    # setup algorithm
+    random_policy = d3rlpy.algos.DiscreteRandomPolicy()
+
+    for i in tqdm(range(n)):
+        # prepare experience replay buffer
+        buffer = d3rlpy.online.buffers.ReplayBuffer(maxlen=100000, env=env)
+
+        # start data collection
+        random_policy.collect(env, buffer, n_steps=100000)
+
+        # export as MDPDataset
+        dataset = buffer.to_mdp_dataset()
+
+        # save MDPDataset
+        dataset.dump(os.path.join(save_dir, f"{env_name}_random_dataset_s{i}.h5"))
+
 
 if __name__ == '__main__':
     # write an argument parser that has dataset name and input directory
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='Acrobot-v1')
-    parser.add_argument('--save_dir', type=str, default='model_logs')
-    parser.add_argument('--epochs', type=int, default=10)
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--dataset', type=str, default='Acrobot-v1')
+    # parser.add_argument('--save_dir', type=str, default='model_logs')
+    # parser.add_argument('--epochs', type=int, default=10)
+    # args = parser.parse_args()
+    #
+    # train_online_collection_poilcy(args.epochs, args.dataset, args.save_dir)
+    # collect_dataset(args.save_dir)
 
-    train_online_collection_poilcy(args.epochs, args.dataset, args.save_dir)
-    collect_dataset(args.save_dir)
+    collect_n_datasets("control_datasets", "Acrobot-v1")
+    collect_n_datasets("control_datasets", "CartPole-v1")

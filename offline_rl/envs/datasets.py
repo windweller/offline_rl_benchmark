@@ -115,7 +115,8 @@ def create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, 
     return datasets, traj_dist
 
 
-def get_sepsis_boostrap_copies(env_name: str, num_copies: int, k_prop: float=0.2) -> Tuple[List[ProbabilityMDPDataset], Sepsis, np.array, float]:
+def get_sepsis_boostrap_copies(env_name: str, num_copies: int, k_prop: float = 0.2) -> Tuple[
+    List[ProbabilityMDPDataset], Sepsis, np.array, float]:
     """
     :param env_name: dataset size
     :param num_copies: number of copies of the dataset
@@ -402,7 +403,7 @@ SEPSIS_POP_ENVS = [
 
 
 def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[List[ProbabilityMDPDataset],
-                                                                               ProbabilityMDPDataset, Sepsis]:
+ProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
     :return:
@@ -443,6 +444,7 @@ def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[L
 
     return datasets, dataset, env
 
+
 # ===== Sepsis Ground Truth ======
 
 SEPSIS_GT_ENVS = [
@@ -456,10 +458,63 @@ SEPSIS_GT_ENVS = [
     'mdp'
 ]
 
+
 def get_sepsis_gt(env_name: str, n=0):
     """
     The goal, creating the sampling from the ground truth simulator evaluation
+    pass in 'n' with 'pomdp' or 'mdp' as env_name to get a different sample each time
     :param env_name:
     :param n:
     :return:
     """
+    assert env_name in SEPSIS_GT_ENVS, print("available env names are: ", SEPSIS_GT_ENVS)
+
+    file_name = 'ens_ope_gt.zip'
+    data_path = os.path.join(DATA_DIRECTORY, file_name)
+
+    if not os.path.exists(data_path):
+        os.makedirs(DATA_DIRECTORY, exist_ok=True)
+        print(f"Donwloading ens_ope_gt.zip into {data_path}...")
+        raise Exception("Download not implemented")
+        # request.urlretrieve(SEPSIS_ENS_URL, data_path)
+        # shutil.unpack_archive(data_path, DATA_DIRECTORY)
+
+    all_states = pd.read_csv(f"{DATA_DIRECTORY}/ens_ope_gt/all_states.csv")
+    env = Sepsis(env_name, all_states)
+
+    # here is a little different
+    if '-' in env_name:
+        mdp_type, data_size = env_name.split('-')
+        data_size = int(data_size)
+    else:
+        mdp_type = env_name
+        data_size = n
+
+    appendage = '_full_states' if mdp_type == 'mdp' else ''
+
+    filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_marginalized_sepsis_5000_c_noise_000_p_005" + appendage + ".csv"
+    data = pd.read_csv(filepath)
+
+    traj_name = env.get_trajectory_marking_name()
+    patient_subdatasets = []
+    for unique_traj in data[traj_name].unique():
+        patient_subdatasets.append(data[data[traj_name] == unique_traj])
+
+    total_patient_num = len(patient_subdatasets)
+    indices = np.arange(total_patient_num)
+
+    if '-' in env_name:
+        # we fix a seed so it's the same result
+        np.random.seed(1996)
+
+    sampled_patients = np.random.choice(indices, data_size, replace=False)
+
+    sampled_patient_subdatasets = []
+    for j, i in enumerate(sampled_patients):
+        df = patient_subdatasets[i].copy()
+        # df[traj_name] = df[traj_name].astype(str) + '_' + str(j)
+        sampled_patient_subdatasets.append(df)
+    sampled_data = pd.concat(sampled_patient_subdatasets)
+    dataset = load_sepsis_dataset(sampled_data, env)
+
+    return dataset, env

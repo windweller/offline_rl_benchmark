@@ -442,3 +442,24 @@ def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[L
     dataset = load_sepsis_dataset(data, env)
 
     return datasets, dataset, env
+
+# ===== Sepsis Ground Truth ======
+
+SEPSIS_GT_ENVS = [
+    'pomdp-200',
+    'pomdp-1000',
+    'pomdp-5000',
+    'pomdp',
+    'mdp-200',
+    'mdp-1000',
+    'mdp-5000',
+    'mdp'
+]
+
+def get_sepsis_gt(env_name: str, n=0):
+    """
+    The goal, creating the sampling from the ground truth simulator evaluation
+    :param env_name:
+    :param n:
+    :return:
+    """

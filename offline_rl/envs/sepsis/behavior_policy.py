@@ -95,7 +95,7 @@ class DiscreteSepsisTabularPolicyImpl(AlgoImplBase):
         return 8
 
 
-class DiscreteSepsisTabularPolicy(AlgoBase, DiscreteProbabilisticPolicyProtocol):
+class DiscreteSepsisTabularPolicy(DiscreteProbabilisticPolicyProtocol):
     def __init__(self, env: Sepsis, policy_npz_path: str,
                  noise_level='05'):
         # load in the npy stuff
@@ -108,6 +108,10 @@ class DiscreteSepsisTabularPolicy(AlgoBase, DiscreteProbabilisticPolicyProtocol)
 
         # self.n_frames = 1
         self._impl = DiscreteSepsisTabularPolicyImpl(self, self.policy_map)
+
+        # self._action_scaler = None
+        # self._batch_size = 4
+        # self._gamma = 0.99
 
     @property
     def n_frames(self) -> int:

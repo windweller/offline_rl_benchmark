@@ -447,19 +447,8 @@ ProbabilityMDPDataset, Sepsis]:
 
 # ===== Sepsis Ground Truth ======
 
-SEPSIS_GT_ENVS = [
-    'pomdp-200',
-    'pomdp-1000',
-    'pomdp-5000',
-    'pomdp',
-    'mdp-200',
-    'mdp-1000',
-    'mdp-5000',
-    'mdp'
-]
 
-
-def get_sepsis_gt(env_name: str, n=0):
+def get_sepsis_gt(env_name: str, n=0, seed=None):
     """
     The goal, creating the sampling from the ground truth simulator evaluation
     pass in 'n' with 'pomdp' or 'mdp' as env_name to get a different sample each time
@@ -467,7 +456,8 @@ def get_sepsis_gt(env_name: str, n=0):
     :param n:
     :return:
     """
-    assert env_name in SEPSIS_GT_ENVS, print("available env names are: ", SEPSIS_GT_ENVS)
+    assert 'pomdp' in env_name or 'mdp' in env_name, print("acceptable format: 'pomdp', 200 for random sample, "
+                                                            "'pomdp-200' for fixed sample ")
 
     file_name = 'ens_ope_gt.zip'
     data_path = os.path.join(DATA_DIRECTORY, file_name)
@@ -505,16 +495,48 @@ def get_sepsis_gt(env_name: str, n=0):
 
     if '-' in env_name:
         # we fix a seed so it's the same result
-        np.random.seed(1996)
+        if seed is None:
+            np.random.seed(1996)
+        else:
+            np.random.seed(seed)
 
-    sampled_patients = np.random.choice(indices, data_size, replace=False)
+    if n != 5000:
+        sampled_patients = np.random.choice(indices, data_size, replace=False)
 
-    sampled_patient_subdatasets = []
-    for j, i in enumerate(sampled_patients):
-        df = patient_subdatasets[i].copy()
-        # df[traj_name] = df[traj_name].astype(str) + '_' + str(j)
-        sampled_patient_subdatasets.append(df)
-    sampled_data = pd.concat(sampled_patient_subdatasets)
-    dataset = load_sepsis_dataset(sampled_data, env)
+        sampled_patient_subdatasets = []
+        for j, i in enumerate(sampled_patients):
+            df = patient_subdatasets[i].copy()
+            # df[traj_name] = df[traj_name].astype(str) + '_' + str(j)
+            sampled_patient_subdatasets.append(df)
+        sampled_data = pd.concat(sampled_patient_subdatasets)
+        dataset = load_sepsis_dataset(sampled_data, env)
+        data = sampled_data
+    else:
+        dataset = load_sepsis_dataset(data, env)
 
-    return dataset, env
+    return dataset, env, data
+
+def get_sepsis_copies(data: pd.DataFrame, env: Sepsis, num_copies: int, k_prop: float = 0.2) -> Tuple[
+    List[ProbabilityMDPDataset], Sepsis, np.array, float]:
+    """
+    :param env_name: dataset size
+    :param num_copies: number of copies of the dataset
+    :return:
+        List[ProbabilityMDPDataset]: list of datasets
+        Sepsis: environment
+        np.array: trajectory distribution (how many times a trajectory is sampled in our procedure)
+        float: scale ratio
+    """
+
+    traj_name = env.get_trajectory_marking_name()
+    patient_subdatasets = []
+    for unique_traj in data[traj_name].unique():
+        patient_subdatasets.append(data[data[traj_name] == unique_traj])
+
+    # k samples in each bootstrap
+    total_patient_num = int(len(patient_subdatasets) * k_prop)
+    indices = np.arange(total_patient_num)
+
+    datasets, traj_dist = create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, traj_name, env)
+
+    return datasets, env, traj_dist, total_patient_num / len(patient_subdatasets)

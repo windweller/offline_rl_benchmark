@@ -482,7 +482,7 @@ def get_sepsis_gt(env_name: str, n=0, seed=None):
 
     appendage = '_full_states' if mdp_type == 'mdp' else ''
 
-    filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_marginalized_sepsis_5000_c_noise_000_p_005" + appendage + ".csv"
+    filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_marginalized_sepsis_5000_c_noise_005_p_005" + appendage + ".csv"
     data = pd.read_csv(filepath)
 
     traj_name = env.get_trajectory_marking_name()

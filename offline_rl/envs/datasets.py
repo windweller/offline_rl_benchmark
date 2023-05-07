@@ -403,7 +403,7 @@ SEPSIS_POP_ENVS = [
 
 
 def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[List[ProbabilityMDPDataset],
-ProbabilityMDPDataset, Sepsis]:
+                                                                               ProbabilityMDPDataset, Sepsis]:
     """
     :param env_name: dataset size
     :return:
@@ -457,7 +457,7 @@ def get_sepsis_gt(env_name: str, n=0, seed=None):
     :return:
     """
     assert 'pomdp' in env_name or 'mdp' in env_name, print("acceptable format: 'pomdp', 200 for random sample, "
-                                                            "'pomdp-200' for fixed sample ")
+                                                           "'pomdp-200' for fixed sample ")
 
     file_name = 'ens_ope_gt.zip'
     data_path = os.path.join(DATA_DIRECTORY, file_name)
@@ -515,6 +515,7 @@ def get_sepsis_gt(env_name: str, n=0, seed=None):
         dataset = load_sepsis_dataset(data, env)
 
     return dataset, env, data
+
 
 def get_sepsis_copies(data: pd.DataFrame, env: Sepsis, num_copies: int, k_prop: float = 0.2) -> Tuple[
     List[ProbabilityMDPDataset], Sepsis, np.array, float]:

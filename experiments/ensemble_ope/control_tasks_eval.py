@@ -18,6 +18,7 @@ import cvxpy as cp
 
 from offline_rl.envs.dataset import sample_bootstrap
 
+
 def get_dataset(dataset_name, save_dir):
     assert dataset_name in ['cartpole-replay', 'cartpole-random', 'acrobot-replay', 'acrobot-random']
 
@@ -33,6 +34,7 @@ def get_dataset(dataset_name, save_dir):
         env = gym.make('Acrobot-v1')
 
     return dataset, env
+
 
 def load_in_control_policies(poilcy_dir: str, dataset_name: str, save_dir: str):
     """
@@ -66,8 +68,10 @@ def load_in_control_policies(poilcy_dir: str, dataset_name: str, save_dir: str):
 fqe_configs = [(3, [32, 32]),
                (3, [64, 64]),
                (3, [128, 128])]
-               # (8, [32, 32]),
-               # (8, [64, 64])]
+
+
+# (8, [32, 32]),
+# (8, [64, 64])]
 
 def create_mse_matrix(policy, dataset_name, save_dir, num_bootstrap=5, k_prop=0.15):
     print("Running ensemble performance")
@@ -95,7 +99,6 @@ def create_mse_matrix(policy, dataset_name, save_dir, num_bootstrap=5, k_prop=0.
         encoder = d3rlpy.models.encoders.VectorEncoderFactory(fqe_hid_dims)
 
         for i, bootstrapped_dataset in enumerate(bootstrapped_datasets):
-
             fqe = DiscreteFQE(algo=policy, encoder_factory=encoder)
             fqe.build_with_dataset(bootstrapped_dataset)
             # we can do an honest estimation here
@@ -131,7 +134,7 @@ def create_mse_matrix(policy, dataset_name, save_dir, num_bootstrap=5, k_prop=0.
     error_matrix_A = scale_ratio * (1 / num_bootstrap) * np.matmul(pre_A, pre_A.T)
     ope_mse = np.diagonal(error_matrix_A)
 
-    return ope_scores, ope_bootstrapped_scores, ope_est_bias, ope_est_var,  ope_mse, error_matrix_A
+    return ope_scores, ope_bootstrapped_scores, ope_est_bias, ope_est_var, ope_mse, error_matrix_A
 
 
 def solve_for_alpha(ope_scores, error_matrix_A):
@@ -195,8 +198,9 @@ def run_experiment(policy_dir: str, dataset_name: str, save_dir: str, n_copies=1
         true_perf = policy_perfs[i]
         ope_row.append(true_perf)
 
-        ope_scores, ope_bootstrapped_scores, est_bias, est_variance,  ope_mse, error_matrix_A = create_mse_matrix(policies[i], dataset_name,
-                                                                                      save_dir, num_bootstrap=n_copies)
+        ope_scores, ope_bootstrapped_scores, est_bias, est_variance, ope_mse, error_matrix_A = create_mse_matrix(
+            policies[i], dataset_name,
+            save_dir, num_bootstrap=n_copies)
 
         np.savez(f"control_tasks_results/policy_{i}_{dataset_name}_{n_copies}_ope_subsampled_scores.npz",
                  ope_bootstrapped_scores=ope_bootstrapped_scores, ope_scores=ope_scores)

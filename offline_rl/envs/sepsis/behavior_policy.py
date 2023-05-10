@@ -123,7 +123,6 @@ class DiscreteSepsisTabularPolicy(DiscreteProbabilisticPolicyProtocol):
         policy_map = {}
         for i in range(features.shape[0]):
             # === this does bug checking ===
-            # currently not passing
 
             # if tuple(features[i]) in policy_map:
             #     assert np.sum(policy_map[tuple(features[i])] == self.poilcy_npz[i]) == 8, print(policy_map[tuple(features[i])],

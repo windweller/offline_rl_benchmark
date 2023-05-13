@@ -50,6 +50,15 @@ POLICY_TRUE_PERF = [
 
 POLICY_TRUE_MEAN_PERF = [x[0] for x in POLICY_TRUE_PERF]
 
+MDP_POLICY_TURE_PERF = [
+    (0.019847619047619048, 0.15585896719920864),
+    (0.011047619047619047, 0.1655930808013073),
+    (0.003904761904761905, 0.17038969564941225),
+    (-0.0017523809523809523, 0.17738065137948913),
+    (-0.00760952380952381, 0.18039513595177578)
+]
+
+
 class DiscreteSepsisTabularPolicyImpl(AlgoImplBase):
     def __init__(self, policy, policy_map):
         self.policy = policy
@@ -146,6 +155,17 @@ def load_sepsis_ensemble_policies(env: Sepsis) -> List[DiscreteSepsisTabularPoli
     policies = []
     for noise in POLICY_NOISE:
         filepath = f"{DATA_DIRECTORY}/ens_ope/marginalized_{noise}_policy.npz"
+        if not os.path.exists(filepath):
+            raise Exception("Must call get_sepsis_ensemble_datasets or other function to download data first")
+        policy = DiscreteSepsisTabularPolicy(env, filepath, noise)
+        policies.append(policy)
+    return policies
+
+
+def load_sepsis_ensemble_mdp_policies(env: Sepsis) -> List[DiscreteSepsisTabularPolicy]:
+    policies = []
+    for noise in POLICY_NOISE:
+        filepath = f"{DATA_DIRECTORY}/ens_ope_gt/full_{noise}_policy.npz"
         if not os.path.exists(filepath):
             raise Exception("Must call get_sepsis_ensemble_datasets or other function to download data first")
         policy = DiscreteSepsisTabularPolicy(env, filepath, noise)

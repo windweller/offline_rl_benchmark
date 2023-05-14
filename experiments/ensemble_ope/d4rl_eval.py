@@ -155,10 +155,26 @@ def run_experiment(policy_perfs, fqe_bootstraps, ope_scores):
     df = pd.DataFrame(rows, columns=header)
     df.to_csv('d4rl_results/mse.csv', index=False)
 
+    # we shouldn't just save mean, should save everything, and find ALL env higher, not just average higher
     opera_mse = df.groupby("env_name")['OPERA'].mean()
     switch_mse = df.groupby("env_name")['SwitchOPE'].mean()
+    avg_mse = df.groupby("env_name")['AvgOPE'].mean()
 
-    return opera_mse, switch_mse
+    return opera_mse, switch_mse, avg_mse
+
+def filter_bad_fqes(fqe_bootstraps, filter_for_env='walker2d-medium-replay-v2'):
+    # we need to identify the index of FQE that explodes on 1 policy
+    # and remove that index from ALL
+
+    fqe_idx_to_remove = []
+    for policy_name, fqe_for_policy in fqe_bootstraps[filter_for_env].items():
+        # fqe_for_policy: (n_estimators, n_bootstrap)
+        # we remove fqe for ANY policy that blows up
+        for idx in range(fqe_for_policy.shape[0]):
+            if np.sum(fqe_for_policy[idx, :] > 1000) > 1:
+                fqe_idx_to_remove.append(idx)
+
+    print(fqe_idx_to_remove)
 
 def run_search(n=4):
     n_estimators = 17
@@ -186,13 +202,30 @@ def run_search(n=4):
                 selected_scores[env_name][policy_name] = scores[env_name][policy_name][combo, :]
 
         try:
-            opera_mse, switch_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
-            combo_to_mse[combo] = (opera_mse, switch_mse)
+            opera_mse, switch_mse, avg_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
+            combo_to_mse[combo] = (opera_mse, switch_mse, avg_mse)
         except:
             print("failed")
 
     pickle.dump(combo_to_mse, open(f"d4rl_results/combo_{n}_to_mse.pkl", "wb"))
 
+def fqe_to_run():
+    combo = (0, 8, 11, 16)
+    fqe_bootstraps = load_fqe_bootstrap()
+    scores = load_ope_scores()
+    perfs = load_policy_perf()
+
+    selected_fqe_boostraps = {}
+    selected_scores = {}
+
+    for env_name, policy_name_to_est in fqe_bootstraps.items():
+        selected_fqe_boostraps[env_name] = {}
+        selected_scores[env_name] = {}
+        for policy_name, policy_ope_bootstrap in policy_name_to_est.items():
+            selected_fqe_boostraps[env_name][policy_name] = policy_ope_bootstrap[combo, :]
+            selected_scores[env_name][policy_name] = scores[env_name][policy_name][combo, :]
+
+    opera_mse, switch_mse, avg_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
 
 if __name__ == '__main__':
     pass
@@ -200,12 +233,15 @@ if __name__ == '__main__':
     # perfs = load_policy_perf()
     #
     # fqe_bootstraps = load_fqe_bootstrap()
+    # filter_bad_fqes(fqe_bootstraps)
     # scores = load_ope_scores()
     #
     # run_experiment(perfs, fqe_bootstraps, scores)
 
-    # run_search(2)
-    # run_search(3)
+    run_search(2)
+    run_search(3)
     run_search(4)
     run_search(5)
     run_search(6)
+
+    # fqe_to_run()

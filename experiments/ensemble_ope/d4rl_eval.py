@@ -160,18 +160,18 @@ def run_experiment(policy_perfs, fqe_bootstraps, ope_scores):
 
     return opera_mse, switch_mse
 
-def run_search():
+def run_search(n=4):
     n_estimators = 17
     column_indices = np.arange(n_estimators)
 
     # Generate all combinations of 4 columns
-    combinations_4 = list(combinations(column_indices, 4))
+    combinations_n = list(combinations(column_indices, n))
 
     perfs = load_policy_perf()
 
     combo_to_mse = {}
 
-    for combo in tqdm(combinations_4):
+    for combo in tqdm(combinations_n):
         fqe_bootstraps = load_fqe_bootstrap()
         scores = load_ope_scores()
 
@@ -185,10 +185,14 @@ def run_search():
                 selected_fqe_boostraps[env_name][policy_name] = policy_ope_bootstrap[combo, :]
                 selected_scores[env_name][policy_name] = scores[env_name][policy_name][combo, :]
 
-        opera_mse, switch_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
-        combo_to_mse[combo] = (opera_mse, switch_mse)
+        try:
+            opera_mse, switch_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
+            combo_to_mse[combo] = (opera_mse, switch_mse)
+        except:
+            print("failed")
 
-    pickle.dump(combo_to_mse, open("d4rl_results/combo_to_mse.pkl", "wb"))
+    pickle.dump(combo_to_mse, open(f"d4rl_results/combo_{n}_to_mse.pkl", "wb"))
+
 
 if __name__ == '__main__':
     pass
@@ -200,4 +204,8 @@ if __name__ == '__main__':
     #
     # run_experiment(perfs, fqe_bootstraps, scores)
 
-    run_search()
+    # run_search(2)
+    # run_search(3)
+    run_search(4)
+    run_search(5)
+    run_search(6)

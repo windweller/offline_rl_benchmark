@@ -1,4 +1,4 @@
-from typing import Any, Callable, Iterator, List, Optional, Tuple, Union, cast, Protocol
+from typing_extensions import Any, Protocol
 
 import torch
 import torch.nn.functional as F
@@ -54,7 +54,7 @@ class DiscreteCQLEvaluationWrapper(DiscreteProbabilisticPolicyProtocol):
 
     """
 
-    def __init__(self, dqn: Union[DQN, DiscreteCQL]):
+    def __init__(self, dqn):
         """
 
         :param dqn:
@@ -90,7 +90,7 @@ class DiscreteCQLTorchWrapper(DiscreteProbabilisticTorchPolicyProtocol):
     This wrapper handles state as torch input.
     """
 
-    def __init__(self, dqn: Union[DQN, DiscreteCQL]):
+    def __init__(self, dqn):
         """
 
         :param dqn:

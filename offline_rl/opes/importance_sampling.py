@@ -38,7 +38,6 @@ def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np
             last = last * (pies[i, t] / pibs[i, t])
             weights[i, t] = last
         weights[i, int(length[i]):] = weights[i, int(length[i]) - 1]
-    import pdb; pdb.set_trace()
     if not no_clip:
         weights = np.clip(weights, clip_lower, clip_upper)
     if not no_weight_norm:

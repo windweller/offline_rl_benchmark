@@ -4,26 +4,28 @@ import cvxpy as cp
 import numpy as np
 
 import pickle
+from itertools import combinations
+
 
 
 def load_policy_perf():
     # env_name: {policy_name: score}
-    return pickle.load(open("d4rl_results/env_scores.pkl", "rb"))
+    return pickle.load(open("d4rl_results/env_discounted_scores.pkl", "rb"))
 
 
 def load_fqe_bootstrap():
     # env_name: {policy_name: np.array}
     # np.array shape is [4, 100]
-    return pickle.load(open("d4rl_results/fqe_scores.pkl", "rb"))
+    return pickle.load(open("d4rl_results/all_checkpoints/fqe_scores.pkl", "rb"))
 
 
 def load_ope_scores():
     # env_name: {policy_name: np.array}
     # np.array shape is [4, 1]
-    return pickle.load(open("d4rl_results/ope_scores.pkl", "rb"))
+    return pickle.load(open("d4rl_results/all_checkpoints/ope_scores_fulldataset.pkl", "rb"))
 
 
-def solve_for_alpha(ope_scores, error_matrix_A):
+def solve_for_alpha(ope_scores, error_matrix_A, verbose=False):
 
     n = error_matrix_A.shape[0]
 
@@ -32,9 +34,14 @@ def solve_for_alpha(ope_scores, error_matrix_A):
     constraints = [cp.sum(x) == 1]
     # prob = cp.Problem(objective, constraints)
     prob = cp.Problem(objective, constraints)
-    print('cvxpy loss: ', prob.solve())
+    if verbose:
+        print('cvxpy loss: ', prob.solve())
+    else:
+        prob.solve()
 
     alpha = x.value.flatten()
+
+    ope_scores = ope_scores.flatten()
 
     score = (ope_scores * alpha).sum()
 
@@ -71,16 +78,26 @@ def run_experiment(policy_perfs, fqe_bootstraps, ope_scores):
     avg_ope_mat = {}
 
     for env_name, policy_name_to_est in fqe_bootstraps.items():
-        print(env_name)
+        if env_name == 'walker2d-medium-v2':
+            continue
+
+        # print(env_name)
         alpha_mat[env_name] = {}
         score_mat[env_name] = {}
         switch_ope_mat[env_name] = {}
         avg_ope_mat[env_name] = {}
 
-        for policy_name, policy_ope_bootstrap in tqdm(policy_name_to_est.items()):
-            print(policy_name)
-            ope_scores_env = ope_scores[env_name][policy_name]
+        for policy_name, policy_ope_bootstrap in policy_name_to_est.items():
+            # print(policy_name)
+            ope_scores_env = ope_scores[env_name][policy_name] # [:3, :]
+            # ope_scores_env = np.delete(ope_scores_env, 1, axis=0)
+            # policy_ope_bootstrap = policy_ope_bootstrap[:3, :]
+            # policy_ope_bootstrap = np.delete(policy_ope_bootstrap, 1, axis=0)
+
             n_estimators =ope_scores_env.shape[0]
+
+            # ope_scores_env = ope_scores_env * 1000  # because we normalized reward
+            # policy_ope_bootstrap = policy_ope_bootstrap * 1000
 
             error_matrix_A, ope_mse, est_bias, est_variance = create_mse_matrix(ope_scores_env, policy_ope_bootstrap)
 
@@ -99,21 +116,88 @@ def run_experiment(policy_perfs, fqe_bootstraps, ope_scores):
     header = ['policy', 'env_name', 'true_perf'] + [f'fqe_{i}' for i in range(n_estimators)] + ['OPERA'] + ['SwitchOPE'] + ['AvgOPE']
     rows = []
     for env_name, policy_name_to_est in fqe_bootstraps.items():
+        if env_name == 'walker2d-medium-v2':
+            continue
         for policy_name, policy_ope_bootstrap in policy_name_to_est.items():
             ope_scores_env = ope_scores[env_name][policy_name]
-            row = [policy_name, env_name] + [policy_perfs[env_name][policy_name]] + list(ope_scores_env.flatten()) + \
-                  [score_mat[env_name][policy_name]] + [switch_ope_mat[env_name][policy_name]] + [avg_ope_mat[env_name][policy_name]]
+            # ope_scores_env = ope_scores_env[:3, :]
+            # ope_scores_env = np.delete(ope_scores_env, 1, axis=0)
+
+            row = [policy_name, env_name] + [policy_perfs[env_name][policy_name]] + list(ope_scores_env.flatten() * 1000) + \
+                  [score_mat[env_name][policy_name] * 1000] + [switch_ope_mat[env_name][policy_name] * 1000 ] + [avg_ope_mat[env_name][policy_name] * 1000]
             rows.append(row)
 
     df = pd.DataFrame(rows, columns=header)
     df.to_csv('d4rl_results/ope.csv', index=False)
 
+    # create the MSE csv
+    header = ['policy', 'env_name', 'true_perf'] + [f'fqe_{i}' for i in range(n_estimators)] + ['OPERA'] + [
+        'SwitchOPE'] + ['AvgOPE']
+    rows = []
+    for env_name, policy_name_to_est in fqe_bootstraps.items():
+        if env_name == 'walker2d-medium-v2':
+            continue
+        for policy_name, policy_ope_bootstrap in policy_name_to_est.items():
+            true_perf = policy_perfs[env_name][policy_name]
+            ope_scores_env = ope_scores[env_name][policy_name]
+            # ope_scores_env = ope_scores_env[:3, :]
+            # ope_scores_env = np.delete(ope_scores_env, 1, axis=0)
+
+            ope_mses = (ope_scores_env.flatten() * 1000 - true_perf) ** 2
+            opera_mse = (score_mat[env_name][policy_name] * 1000 - true_perf) ** 2
+            switch_mse = (switch_ope_mat[env_name][policy_name] * 1000 - true_perf) ** 2
+            avg_ope_mse = (avg_ope_mat[env_name][policy_name] * 1000 - true_perf) ** 2
+
+            row = [policy_name, env_name] + [policy_perfs[env_name][policy_name]] + list(ope_mses) + \
+                  [opera_mse] + [switch_mse] + [avg_ope_mse]
+            rows.append(row)
+
+    df = pd.DataFrame(rows, columns=header)
+    df.to_csv('d4rl_results/mse.csv', index=False)
+
+    opera_mse = df.groupby("env_name")['OPERA'].mean()
+    switch_mse = df.groupby("env_name")['SwitchOPE'].mean()
+
+    return opera_mse, switch_mse
+
+def run_search():
+    n_estimators = 17
+    column_indices = np.arange(n_estimators)
+
+    # Generate all combinations of 4 columns
+    combinations_4 = list(combinations(column_indices, 4))
+
+    perfs = load_policy_perf()
+
+    combo_to_mse = {}
+
+    for combo in tqdm(combinations_4):
+        fqe_bootstraps = load_fqe_bootstrap()
+        scores = load_ope_scores()
+
+        selected_fqe_boostraps = {}
+        selected_scores = {}
+
+        for env_name, policy_name_to_est in fqe_bootstraps.items():
+            selected_fqe_boostraps[env_name] = {}
+            selected_scores[env_name] = {}
+            for policy_name, policy_ope_bootstrap in policy_name_to_est.items():
+                selected_fqe_boostraps[env_name][policy_name] = policy_ope_bootstrap[combo, :]
+                selected_scores[env_name][policy_name] = scores[env_name][policy_name][combo, :]
+
+        opera_mse, switch_mse = run_experiment(perfs, selected_fqe_boostraps, selected_scores)
+        combo_to_mse[combo] = (opera_mse, switch_mse)
+
+    pickle.dump(combo_to_mse, open("d4rl_results/combo_to_mse.pkl", "wb"))
 
 if __name__ == '__main__':
-    perfs = load_policy_perf()
-    print(perfs)
+    pass
 
-    fqe_bootstraps = load_fqe_bootstrap()
-    scores = load_ope_scores()
+    # perfs = load_policy_perf()
+    #
+    # fqe_bootstraps = load_fqe_bootstrap()
+    # scores = load_ope_scores()
+    #
+    # run_experiment(perfs, fqe_bootstraps, scores)
 
-    run_experiment(perfs, fqe_bootstraps, scores)
+    run_search()

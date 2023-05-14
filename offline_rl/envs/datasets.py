@@ -115,7 +115,8 @@ def create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, 
     return datasets, traj_dist
 
 
-def get_sepsis_boostrap_copies(env_name: str, num_copies: int, k_prop: float=0.2) -> Tuple[List[ProbabilityMDPDataset], Sepsis, np.array, float]:
+def get_sepsis_boostrap_copies(env_name: str, num_copies: int, k_prop: float = 0.2) -> Tuple[
+    List[ProbabilityMDPDataset], Sepsis, np.array, float]:
     """
     :param env_name: dataset size
     :param num_copies: number of copies of the dataset
@@ -442,3 +443,105 @@ def get_sepsis_population_full(env_name: str, load_first_n: int = 20) -> Tuple[L
     dataset = load_sepsis_dataset(data, env)
 
     return datasets, dataset, env
+
+
+# ===== Sepsis Ground Truth ======
+
+
+def get_sepsis_gt(env_name: str, n=0, seed=None):
+    """
+    The goal, creating the sampling from the ground truth simulator evaluation
+    pass in 'n' with 'pomdp' or 'mdp' as env_name to get a different sample each time
+    :param env_name:
+    :param n:
+    :return:
+    """
+    assert 'pomdp' in env_name or 'mdp' in env_name, print("acceptable format: 'pomdp', 200 for random sample, "
+                                                           "'pomdp-200' for fixed sample ")
+
+    file_name = 'ens_ope_gt.zip'
+    data_path = os.path.join(DATA_DIRECTORY, file_name)
+
+    if not os.path.exists(data_path):
+        os.makedirs(DATA_DIRECTORY, exist_ok=True)
+        print(f"Donwloading ens_ope_gt.zip into {data_path}...")
+        raise Exception("Download not implemented")
+        # request.urlretrieve(SEPSIS_ENS_URL, data_path)
+        # shutil.unpack_archive(data_path, DATA_DIRECTORY)
+
+    all_states = pd.read_csv(f"{DATA_DIRECTORY}/ens_ope_gt/all_states.csv")
+    env = Sepsis(env_name, all_states)
+
+    # here is a little different
+    if '-' in env_name:
+        mdp_type, data_size = env_name.split('-')
+        data_size = int(data_size)
+    else:
+        mdp_type = env_name
+        data_size = n
+
+    # appendage = '_full_states' if mdp_type == 'mdp' else ''
+
+    if mdp_type == 'pomdp':
+        filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_marginalized_sepsis_5000_c_noise_000_p_005.csv"
+    else:
+        filepath = f"{DATA_DIRECTORY}/ens_ope_gt/gt_full_sepsis_5000_w_noise_005_full_states.csv"
+
+    data = pd.read_csv(filepath)
+
+    traj_name = env.get_trajectory_marking_name()
+    patient_subdatasets = []
+    for unique_traj in data[traj_name].unique():
+        patient_subdatasets.append(data[data[traj_name] == unique_traj])
+
+    total_patient_num = len(patient_subdatasets)
+    indices = np.arange(total_patient_num)
+
+    if '-' in env_name:
+        # we fix a seed so it's the same result
+        if seed is None:
+            np.random.seed(1996)
+        else:
+            np.random.seed(seed)
+
+    if n != 5000:
+        sampled_patients = np.random.choice(indices, data_size, replace=False)
+
+        sampled_patient_subdatasets = []
+        for j, i in enumerate(sampled_patients):
+            df = patient_subdatasets[i].copy()
+            # df[traj_name] = df[traj_name].astype(str) + '_' + str(j)
+            sampled_patient_subdatasets.append(df)
+        sampled_data = pd.concat(sampled_patient_subdatasets)
+        dataset = load_sepsis_dataset(sampled_data, env)
+        data = sampled_data
+    else:
+        dataset = load_sepsis_dataset(data, env)
+
+    return dataset, env, data
+
+
+def get_sepsis_copies(data: pd.DataFrame, env: Sepsis, num_copies: int, k_prop: float = 0.2) -> Tuple[
+    List[ProbabilityMDPDataset], Sepsis, np.array, float]:
+    """
+    :param env_name: dataset size
+    :param num_copies: number of copies of the dataset
+    :return:
+        List[ProbabilityMDPDataset]: list of datasets
+        Sepsis: environment
+        np.array: trajectory distribution (how many times a trajectory is sampled in our procedure)
+        float: scale ratio
+    """
+
+    traj_name = env.get_trajectory_marking_name()
+    patient_subdatasets = []
+    for unique_traj in data[traj_name].unique():
+        patient_subdatasets.append(data[data[traj_name] == unique_traj])
+
+    # k samples in each bootstrap
+    total_patient_num = int(len(patient_subdatasets) * k_prop)
+    indices = np.arange(total_patient_num)
+
+    datasets, traj_dist = create_df_copy(num_copies, indices, total_patient_num, patient_subdatasets, traj_name, env)
+
+    return datasets, env, traj_dist, total_patient_num / len(patient_subdatasets)

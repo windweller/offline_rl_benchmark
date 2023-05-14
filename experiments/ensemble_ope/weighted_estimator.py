@@ -173,8 +173,8 @@ def run_exp1(dataset_name='pomdp-200', n_copies=20, ris=False,
     else:
         eval_ope_names = ['clipped_is', 'clipped_wis']
 
-    del policies[1]
-    policies = policies[:2]  # we take the first two policies
+    # del policies[1]
+    # policies = policies[:2]  # we take the first two policies
 
     print("Running ensemble performance")
 

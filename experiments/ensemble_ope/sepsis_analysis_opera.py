@@ -104,7 +104,7 @@ def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20
     # 2. alphas outputted by ours for all estimators
     # 3. SwitchOPE, AverageOPE, etc.
 
-    estimator_names = ['IS', 'WIS', 'CLIS', 'CLWIS']
+    estimator_names = ['IS', 'WIS']  # 'CLIS', 'CLWIS'
 
     true_mse = {}
     true_bias, true_variance = defaultdict(list), defaultdict(list)

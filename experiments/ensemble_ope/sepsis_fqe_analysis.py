@@ -63,24 +63,13 @@ def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer, scorer
              sample_times=sample_times)
 
 
-# this is a partial function
-def no_clip_scorer(scorer_fn):
-    return lambda policy, episodes: scorer_fn(policy, episodes, no_clip=True)
-
-
-def clip_scorer(scorer_fn, clip_ratio):
-    upper = 1 / clip_ratio
-    lower = clip_ratio
-    return lambda policy, episodes: scorer_fn(policy, episodes, clip_lower=lower, clip_upper=upper, no_clip=False)
-
-
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--save_dir', type=str, default="sepsis_analysis_results")
     parser.add_argument('--env', type=str, default="pomdp")
-    parser.add_argument('--scorer', type=str, default='IS', choices=['IS', 'WIS', 'CLIS', 'CLWIS'])
+    parser.add_argument('--scorer', type=str, default='IS', choices=['FQE'])
     parser.add_argument('--clip', type=float, default=0.02)
 
     # for True MSE
@@ -100,16 +89,6 @@ if __name__ == '__main__':
 
     print(args)
 
-    if args.scorer == 'IS':
-        scorer = no_clip_scorer(importance_sampling_scorer)
-    elif args.scorer == 'WIS':
-        scorer = no_clip_scorer(wis_scorer)
-    elif args.scorer == 'CLIS':
-        scorer = clip_scorer(importance_sampling_scorer, args.clip)
-    elif args.scorer == 'CLWIS':
-        scorer = clip_scorer(wis_scorer, args.clip)
-    else:
-        raise NotImplementedError
 
     if args.compute_true_mse:
         save_true_MSE_for_scorer(args.env, args.n, scorer, args.scorer, args.save_dir)

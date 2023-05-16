@@ -7,7 +7,7 @@ from offline_rl.envs.datasets import DATA_DIRECTORY
 from offline_rl.algs.policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 from d3rlpy.algos.base import AlgoBase, AlgoImplBase
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 # note the naming convention change here (different from datasets.py)
 # POLICY_NOISE = ['0', '005', '010', '015', '020',
@@ -87,7 +87,16 @@ class DiscreteSepsisTabularPolicyImpl(AlgoImplBase):
         pass
 
     def sample_action(self, x) -> np.ndarray:
-        pass
+        actions = []
+        for i in range(x.shape[0]):
+            # we randomly assign probability
+            if tuple(x[i, :].astype(int)) not in self.policy_map:
+                prob = np.ones(8) / 8
+            else:
+                prob = self.policy_map[tuple(x[i].astype(int))]
+            actions.append(np.random.choice(8, p=prob))
+
+        return np.array(actions)
 
     def save_model(self, fname: str) -> None:
         pass
@@ -105,6 +114,7 @@ class DiscreteSepsisTabularPolicyImpl(AlgoImplBase):
 
 
 class DiscreteSepsisTabularPolicy(DiscreteProbabilisticPolicyProtocol):
+
     def __init__(self, env: Sepsis, policy_npz_path: str,
                  noise_level='05'):
         # load in the npy stuff

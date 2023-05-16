@@ -229,6 +229,7 @@ def _make_batches(
         batch = TransitionMiniBatch(transitions, n_frames)
         yield batch
 
+
 # ===== The following two functions work with any D3rlpy MDPDataset =====
 # They have been tested to be able to recreate the same dataset
 # And is generally efficient

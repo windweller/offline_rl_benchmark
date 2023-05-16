@@ -236,7 +236,7 @@ class GraphEnv(gym.Env):
 
 class GraphPolicy(AlgoBase, DiscreteProbabilisticPolicyProtocol):
 
-    def __init__(self, noise_level = 0, noise_fn = lambda x: np.zeros_like(x), env = None):
+    def __init__(self, noise_level = 0.0, noise_fn = lambda x: np.zeros_like(x)):
         super().__init__(
             batch_size=1,
             n_frames=4,

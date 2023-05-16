@@ -48,10 +48,7 @@ def load_true_scores(n, estimator_name, env_name):
     if env_name == 'mdp':
         file_name = 'env_mdp_true_MSE_{}_n_{}.npz'
     else:
-        if estimator_name == 'CLWIS':
-            file_name = 'env_pomdp_true_MSE_{}_n_{}.npz'
-        else:
-            file_name = 'true_MSE_{}_n_{}.npz'
+        file_name = 'env_pomdp_true_MSE_{}_n_{}.npz'
     # this is actually the true score
     # (dataset_sample_times,)
     return np.load(file_dir + file_name.format(estimator_name, n))['true_MSE']
@@ -59,7 +56,7 @@ def load_true_scores(n, estimator_name, env_name):
 
 def load_boostrap_scores(n, estimator_name):
     assert estimator_name in ['IS', 'WIS', 'CLIS', 'CLWIS']
-    file_dir = "./sepsis_analysis_results2/"
+    file_dir = "./sepsis_analysis_results/"
     file_name = 'env_pomdp_bootstrap_MSE_{}_n_{}.npz'
     # (dataset_sample_times, bootstrap_times)
     results = np.load(file_dir + file_name.format(estimator_name, n))

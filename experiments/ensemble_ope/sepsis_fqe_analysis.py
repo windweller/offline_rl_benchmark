@@ -4,11 +4,13 @@ We produce the stats files necessary for Sepsis analysis
 
 from offline_rl.envs.datasets import get_sepsis, get_sepsis_boostrap_copies, get_sepsis_ensemble_datasets, \
     get_sepsis_subsample_copies, get_sepsis_population_full, get_sepsis_gt, get_sepsis_copies
-from offline_rl.envs.sepsis.behavior_policy import load_sepsis_ensemble_policies, POLICY_TRUE_MEAN_PERF
+from offline_rl.envs.sepsis.behavior_policy import load_sepsis_ensemble_policies, POLICY_TRUE_MEAN_PERF, \
+    load_sepsis_ensemble_mdp_policies, MDP_POLICY_TURE_PERF
 
-from offline_rl.envs.dataset import convert_dataset_for_is_ope
-from offline_rl.opes.importance_sampling import compute_pib_pie, importance_sampling_scorer, wis_scorer, \
-    cwpdis_scorer, pdis_scorer
+from offline_rl.opes.tabular_fqe import TabularFQE
+from d3rlpy.metrics.scorer import initial_state_value_estimation_scorer
+
+from sklearn.model_selection import train_test_split
 
 from tqdm import tqdm
 import pandas as pd
@@ -30,22 +32,43 @@ opt_true_perf = POLICY_TRUE_MEAN_PERF[0]
 
 # Once we save these, actually, we can get
 
-def save_true_MSE_for_scorer(env, n, scorer, scorer_name, save_dir):
+def cross_fit_fqe_scorer(sepsis, dataset):
+    # cross-fitting (in causal inference)
+    scores = []
+    train_episodes, test_episodes = train_test_split(dataset.episodes, test_size=0.5)
+
+    fqe = TabularFQE(algo=opt_policy)
+    fqe.build_with_env(sepsis)
+
+    fqe.fit(train_episodes, n_epochs=10)
+    score = initial_state_value_estimation_scorer(fqe, test_episodes)
+    scores.append(score)
+
+    fqe = TabularFQE(algo=opt_policy)
+    fqe.build_with_env(sepsis)
+
+    fqe.fit(test_episodes, n_epochs=10)
+    score = initial_state_value_estimation_scorer(fqe, train_episodes)
+    scores.append(score)
+
+    score = sum(scores) / 2
+
+    return score
+
+
+def save_true_MSE_for_scorer(env, n, scorer_name, save_dir):
     assert env in {'pomdp', 'mdp'}
     sample_times = 50
 
     true_MSE = np.zeros(sample_times)
     for j in tqdm(range(sample_times)):
         dataset, sepsis, _ = get_sepsis_gt(env, n)
-        dataset_with_prob = convert_dataset_for_is_ope(dataset)
-        score = scorer(opt_policy, dataset_with_prob.episodes)
-        true_MSE[j] = score
+        true_MSE[j] = cross_fit_fqe_scorer(sepsis, dataset)
 
     np.savez(f'{save_dir}/env_{env}_true_MSE_{scorer_name}_n_{n}.npz', true_MSE=true_MSE, sample_times=sample_times)
 
 
-def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer, scorer_name, save_dir):
-
+def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer_name, save_dir):
     assert env in {'pomdp', 'mdp'}
     bootstrap_stats = np.zeros((sample_times, n_copies))
 
@@ -55,11 +78,11 @@ def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer, scorer
         k_prop = k / n
         datasets, sepsis, traj_dist, scale_ratio = get_sepsis_copies(pd_data, sepsis, n_copies, k_prop=k_prop)
         for j, dataset in enumerate(datasets):
-            dataset_with_prob = convert_dataset_for_is_ope(dataset)
-            score = scorer(opt_policy, dataset_with_prob.episodes)
+            score = cross_fit_fqe_scorer(sepsis, dataset)
             bootstrap_stats[d_i, j] = score
 
-    np.savez(f'{save_dir}/env_{env}_bootstrap_MSE_{scorer_name}_n_{n}.npz', bootstrap_stats=bootstrap_stats, n_copies=n_copies,
+    np.savez(f'{save_dir}/env_{env}_bootstrap_MSE_{scorer_name}_n_{n}.npz', bootstrap_stats=bootstrap_stats,
+             n_copies=n_copies,
              sample_times=sample_times)
 
 
@@ -89,9 +112,18 @@ if __name__ == '__main__':
 
     print(args)
 
+    # ==== Load the policy ====
+    dataset, sepsis, data = get_sepsis_gt('{}-200'.format(args.env))
+    if args.env == 'pomdp':
+        policies = load_sepsis_ensemble_policies(sepsis)
+    else:
+        policies = load_sepsis_ensemble_mdp_policies(sepsis)
+
+    opt_policy = policies[0]
+    opt_true_perf = POLICY_TRUE_MEAN_PERF[0] if args.env == 'pomdp' else MDP_POLICY_TURE_PERF[0]
 
     if args.compute_true_mse:
-        save_true_MSE_for_scorer(args.env, args.n, scorer, args.scorer, args.save_dir)
+        save_true_MSE_for_scorer(args.env, args.n, args.scorer, args.save_dir)
 
     if args.compute_bootstrap_mse:
-        save_bootstrap_MSE_for_scorer(args.env, args.n, args.n_copies, args.sample_times, scorer, args.scorer, args.save_dir)
+        save_bootstrap_MSE_for_scorer(args.env, args.n, args.n_copies, args.sample_times, args.scorer, args.save_dir)

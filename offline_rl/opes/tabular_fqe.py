@@ -41,7 +41,7 @@ class TabularFQE(object):
         return tuple(list(state) + [int(action)])
 
     def fit(self, test_episodes, n_epochs):
-        for _ in tqdm(range(n_epochs)):
+        for _ in range(n_epochs):
             for episode in test_episodes:
                 for t, transition in enumerate(episode):
                     done = True if t == len(episode) - 1 else False

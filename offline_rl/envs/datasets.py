@@ -485,7 +485,7 @@ def get_sepsis_gt(env_name: str, n=0, seed=None):
     if mdp_type == 'pomdp':
         filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_marginalized_sepsis_5000_c_noise_000_p_005.csv"
     else:
-        filepath = f"{DATA_DIRECTORY}/ens_ope_gt/gt_full_sepsis_5000_w_noise_005_full_states.csv"
+        filepath = f"{DATA_DIRECTORY}/ens_ope_gt/consistent_gt_full_sepsis_5000_w_noise_000_p_005_full_states.csv"
 
     data = pd.read_csv(filepath)
 
@@ -520,6 +520,31 @@ def get_sepsis_gt(env_name: str, n=0, seed=None):
 
     return dataset, env, data
 
+
+def get_sepsis_train_test_split(data: pd.DataFrame, env: Sepsis, test_size: float = 0.5,
+                                seed=None) -> List[ProbabilityMDPDataset]:
+    traj_name = env.get_trajectory_marking_name()
+    patient_subdatasets = []
+    for unique_traj in data[traj_name].unique():
+        patient_subdatasets.append(data[data[traj_name] == unique_traj])
+
+    if seed is not None:
+        np.seed(seed)
+
+    np.random.shuffle(patient_subdatasets)
+
+    train_size = int(len(patient_subdatasets) * (1 - test_size))
+
+    train_patients = patient_subdatasets[:train_size]
+    test_patients = patient_subdatasets[train_size:]
+
+    train_data = pd.concat(train_patients)
+    test_data = pd.concat(test_patients)
+
+    train_dataset = load_sepsis_dataset(train_data, env)
+    test_dataset = load_sepsis_dataset(test_data, env)
+
+    return [train_dataset, test_dataset]
 
 def get_sepsis_copies(data: pd.DataFrame, env: Sepsis, num_copies: int, k_prop: float = 0.2) -> Tuple[
     List[ProbabilityMDPDataset], Sepsis, np.array, float]:

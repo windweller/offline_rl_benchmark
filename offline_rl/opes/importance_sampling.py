@@ -17,12 +17,16 @@ from d3rlpy.metrics.scorer import WINDOW_SIZE
 from offline_rl.envs.dataset import _make_batches
 from offline_rl.algs.policy_evaluation_wrappers import DiscreteProbabilisticPolicyProtocol
 
+
 def check_if_action_is_proper_probability(transition: Transition):
-    assert type(transition.action) != np.int32, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
-    assert np.abs(np.sum(transition.action) - 1) < 1e-6, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
+    assert type(
+        transition.action) != np.int32, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
+    assert np.abs(np.sum(
+        transition.action) - 1) < 1e-6, "In order to be evaluated, the action must be a probability, try convert_dataset_for_is_ope()"
+
 
 def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np.ndarray, max_time: int,
-             no_weight_norm: bool=False, clip_lower: float=1e-16, clip_upper: float=1e3,
+             no_weight_norm: bool = False, clip_lower: float = 1e-16, clip_upper: float = 1e3,
              no_clip=False) -> Tuple[float, np.ndarray]:
     """
     Private function used by the scorer
@@ -49,9 +53,10 @@ def _wis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np
     # return w_i associated with each N
     return (weights[:, -1] * rewards.sum(axis=-1)).sum(axis=0), weights[:, -1]
 
+
 def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length: np.ndarray, max_time: int,
-                no_weight_norm: bool=False,
-                clip_lower: float=1e-16, clip_upper: float=1e3) -> float:
+                no_weight_norm: bool = False,
+                clip_lower: float = 1e-16, clip_upper: float = 1e3) -> float:
     n = pibs.shape[0]
     weights = np.ones((n, max_time))
     wis_weights = np.ones(n)
@@ -78,6 +83,7 @@ def _cwpdis_ope(pibs: np.ndarray, pies: np.ndarray, rewards: np.ndarray, length:
         score = (rewards * weights).sum(axis=1).mean()
 
     return score
+
 
 def compute_pib_pie(algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode]) -> Tuple[np.ndarray, np.ndarray,
                                                                                                  np.ndarray, np.ndarray,
@@ -112,9 +118,10 @@ def compute_pib_pie(algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Ep
 
     return pibs, pies, rewards, lengths, max_t
 
+
 def importance_sampling_scorer(
-    algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
-    clip_lower: float=1e-16, clip_upper: float=1e3, no_clip=False
+        algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
+        clip_lower: float = 1e-16, clip_upper: float = 1e3, no_clip=False,
 ) -> float:
     """
     :param algo:
@@ -132,9 +139,21 @@ def importance_sampling_scorer(
 
     return score
 
+
+def importance_sampling_scorer_with_weights(algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
+                                            clip_lower: float = 1e-16, clip_upper: float = 1e3, no_clip=False,
+                                            ) -> Tuple[float, np.array]:
+    check_if_action_is_proper_probability(episodes[0].transitions[0])
+    pibs, pies, rewards, lengths, max_t = compute_pib_pie(algo, episodes)
+    score, weights = _wis_ope(pibs, pies, rewards, lengths, max_t, no_weight_norm=True,
+                              clip_lower=clip_lower, clip_upper=clip_upper, no_clip=no_clip)
+
+    return score, weights
+
+
 def wis_scorer(
-    algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
-    clip_lower: float=1e-16, clip_upper: float=1e3, no_clip=False
+        algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
+        clip_lower: float = 1e-16, clip_upper: float = 1e3, no_clip=False
 ) -> float:
     """
     :param algo:
@@ -150,6 +169,7 @@ def wis_scorer(
 
     return score
 
+
 def pdis_scorer(
         algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],
         clip_lower: float = 1e-16, clip_upper: float = 1e3
@@ -157,8 +177,9 @@ def pdis_scorer(
     check_if_action_is_proper_probability(episodes[0].transitions[0])
     pibs, pies, rewards, lengths, max_t = compute_pib_pie(algo, episodes)
     score = _cwpdis_ope(pibs, pies, rewards, lengths, max_t, no_weight_norm=True,
-                              clip_lower=clip_lower, clip_upper=clip_upper)
+                        clip_lower=clip_lower, clip_upper=clip_upper)
     return score
+
 
 def cwpdis_scorer(
         algo: DiscreteProbabilisticPolicyProtocol, episodes: List[Episode],

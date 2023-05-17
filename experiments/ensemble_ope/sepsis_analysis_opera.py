@@ -11,7 +11,7 @@ from collections import defaultdict
 from offline_rl.envs.datasets import get_sepsis, get_sepsis_boostrap_copies, get_sepsis_ensemble_datasets, \
     get_sepsis_subsample_copies, get_sepsis_population_full, get_sepsis_gt, get_sepsis_copies
 from offline_rl.envs.sepsis.behavior_policy import load_sepsis_ensemble_policies, POLICY_TRUE_MEAN_PERF, \
-    load_sepsis_ensemble_mdp_policies, MDP_POLICY_TURE_PERF
+    load_sepsis_ensemble_mdp_policies, MDP_POLICY_TURE_MEAN_PERF
 
 from offline_rl.envs.dataset import convert_dataset_for_is_ope
 from offline_rl.opes.importance_sampling import compute_pib_pie, importance_sampling_scorer, wis_scorer, \
@@ -32,18 +32,19 @@ def solve_for_alpha(ope_scores, error_matrix_A):
     objective = cp.Minimize(cp.quad_form(x, error_matrix_A))
     constraints = [cp.sum(x) == 1]
     prob = cp.Problem(objective, constraints)
-    print('cvxpy loss: ', prob.solve())
+    cvxpy_loss = prob.solve()
+    print('cvxpy loss: ', cvxpy_loss)
 
     alpha = x.value.flatten()
 
     score = (ope_scores * alpha).sum()
 
-    return alpha, score
+    return alpha, score, cvxpy_loss
 
 
 def load_true_scores(n, estimator_name, env_name):
     assert env_name in ['mdp', 'pomdp']
-    assert estimator_name in ['IS', 'WIS', 'CLIS', 'CLWIS']
+    assert estimator_name in ['IS', 'WIS', 'CLIS', 'CLWIS', 'FQE']
     file_dir = "./sepsis_analysis_results/"
     if env_name == 'mdp':
         file_name = 'env_mdp_true_MSE_{}_n_{}.npz'
@@ -54,12 +55,12 @@ def load_true_scores(n, estimator_name, env_name):
     return np.load(file_dir + file_name.format(estimator_name, n))['true_MSE']
 
 
-def load_boostrap_scores(n, estimator_name):
-    assert estimator_name in ['IS', 'WIS', 'CLIS', 'CLWIS']
+def load_boostrap_scores(env_name, n, estimator_name):
+    assert estimator_name in ['IS', 'WIS', 'CLIS', 'CLWIS', 'FQE']
     file_dir = "./sepsis_analysis_results/"
-    file_name = 'env_pomdp_bootstrap_MSE_{}_n_{}.npz'
+    file_name = f'env_{env_name}_bootstrap_MSE_{estimator_name}_n_{n}.npz'
     # (dataset_sample_times, bootstrap_times)
-    results = np.load(file_dir + file_name.format(estimator_name, n))
+    results = np.load(file_dir + file_name)
     return results['bootstrap_stats'], results['ope_scores']
 
 
@@ -91,17 +92,17 @@ def compute_mse_matrix(ope_scores, ope_bootstrapped_scores, n):
     return error_matrix_A, ope_mse, est_bias, est_variance
 
 
-def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20, n_copies=100):
-    n_values = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000,
-                1100, 1200, 1300, 1400, 1500]  # 1600, 2400, 3200
+def compute_opera_scores(env, estimator_names,
+                         true_mdp_sample_times=50,
+                         bootstrap_mdp_sample_times=20, n_copies=100):
+    n_values = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, ]
+    # 1100, 1200, 1300, 1400, 1500]  # 1600, 2400, 3200
 
     # we should compute stats for ALL estimators (MSE)
     # save the following things:
     # 1. MSE per estimator for all ns (bootstrap should be lower than true MSE)
     # 2. alphas outputted by ours for all estimators
     # 3. SwitchOPE, AverageOPE, etc.
-
-    estimator_names = ['IS', 'WIS']  # 'CLIS', 'CLWIS'
 
     true_mse = {}
     true_bias, true_variance = defaultdict(list), defaultdict(list)
@@ -110,7 +111,7 @@ def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20
     for estimator_name in tqdm(estimator_names):
         true_mse[estimator_name] = []
         for n in n_values:
-            true_scores = load_true_scores(n, estimator_name, 'pomdp')
+            true_scores = load_true_scores(n, estimator_name, env)
             mse = ((true_scores - opt_true_perf) ** 2).mean()
             true_mse[estimator_name].append(mse)
             bias = (true_scores - opt_true_perf).mean()
@@ -124,7 +125,7 @@ def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20
     for estimator_name in tqdm(estimator_names):
         bootstrap_mse[estimator_name] = []
         for n in n_values:
-            bootstrap_scores, ope_scores = load_boostrap_scores(n, estimator_name)
+            bootstrap_scores, ope_scores = load_boostrap_scores(env, n, estimator_name)
             # we additionally have to iterate through the sample_time here
             average_mse = []
             average_bias, average_variance = [], []
@@ -145,51 +146,74 @@ def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20
     opera_running_stats = {}
 
     # first true MSE
+
+    # this should be -- the datasets still vary, but we combine them in the same way
+    # so the alphas are optimal and fixed, but the OPE still subjects to dataset shifts
     opera_running_stats['true_mse'] = {}
-    opera_true_mse, opera_true_bias = [], []
+    opera_true_mse, opera_true_bias, opera_true_variance = [], [], []
     opera_scores = []
     opera_alphas = []
     for n in tqdm(n_values):
         # we use the average of true_scores as the OPE score
+
+        # TODO: this part is wrong
+        # we compute a single alpha
+        # and use it to blend everything else
+
         ope_scores = np.zeros(len(estimator_names))
         ope_bootstrapped_scores = np.zeros((len(estimator_names), true_mdp_sample_times))
         for j, estimator_name in enumerate(estimator_names):
-            true_scores = load_true_scores(n, estimator_name, 'pomdp')
+            true_scores = load_true_scores(n, estimator_name, env)
             ope_scores[j] = true_scores.mean()
             ope_bootstrapped_scores[j, :] = true_scores
 
         error_matrix_A, ope_mse, est_bias, est_variance = compute_mse_matrix(ope_scores, ope_bootstrapped_scores, n)
-        alpha, score = solve_for_alpha(ope_scores, error_matrix_A)
+        # we compute one optimal alpha_star, use it to blend everything
+        alpha_star, _, _ = solve_for_alpha(ope_scores, error_matrix_A)
 
-        # this is SE, not MSE
-        opera_true_mse.append((score - opt_true_perf) ** 2)
-        opera_true_bias.append(score - opt_true_perf)
+        scores = []
+        for i in range(true_mdp_sample_times):
+            ope_scores = ope_bootstrapped_scores[:, i].flatten()  # be careful here
+            score = (ope_scores * alpha_star).sum()
+            scores.append(score)
+        scores = np.array(scores)
 
-        opera_scores.append(score)
-        opera_alphas.append(alpha)
+        opera_true_mse.append(((scores - opt_true_perf) ** 2).mean())
+        opera_true_bias.append((scores - opt_true_perf).mean())
+        opera_true_variance.append(((scores - np.mean(scores)) ** 2).mean())
+
+        opera_scores.append(scores)
+        opera_alphas.append(alpha_star)
 
     opera_running_stats['true_mse']['scores'] = opera_scores
     opera_running_stats['true_mse']['alphas'] = opera_alphas
     true_mse['opera'] = opera_true_mse
     true_bias['opera'] = opera_true_bias
+    true_variance['opera'] = opera_true_variance  # this wasn't here before, need rerun
 
     # then bootstrap MSE
     opera_running_stats['bootstrap_mse'] = {}
     opera_true_mse, opera_true_bias, opera_true_variance = [], [], []
+    opera_scores, opera_alphas, opera_cvx_loss = [], [], []
     for n in tqdm(n_values):
         scores = np.zeros(bootstrap_mdp_sample_times)
+        alphas = np.zeros((bootstrap_mdp_sample_times, len(estimator_names)))
+        cvxpy_losses = np.zeros(bootstrap_mdp_sample_times)
+
         # essentially we ran our algorithm on 20 datasets
         for i in range(bootstrap_mdp_sample_times):
             ope_scores = np.zeros(len(estimator_names))
             ope_bootstrapped_scores = np.zeros((len(estimator_names), n_copies))
             for j, estimator_name in enumerate(estimator_names):
-                bootstrap_scores, scores = load_boostrap_scores(n, estimator_name)
+                bootstrap_scores, scores = load_boostrap_scores(env, n, estimator_name)
                 ope_scores[j] = scores[i]
-                ope_bootstrapped_scores[j, :] = bootstrap_scores[i, :] # i-th dataset for j-th estimator
+                ope_bootstrapped_scores[j, :] = bootstrap_scores[i, :]  # i-th dataset for j-th estimator
 
             error_matrix_A, ope_mse, est_bias, est_variance = compute_mse_matrix(ope_scores, ope_bootstrapped_scores, n)
-            alpha, score = solve_for_alpha(ope_scores, error_matrix_A)
+            alpha, score, cvxpy_loss = solve_for_alpha(ope_scores, error_matrix_A)
             scores[i] = score
+            alphas[i] = alpha
+            cvxpy_losses[i] = cvxpy_loss
 
         mse = ((scores - opt_true_perf) ** 2).mean()
         bias = (scores - opt_true_perf).mean()
@@ -199,23 +223,33 @@ def compute_opera_scores(true_mdp_sample_times=50, bootstrap_mdp_sample_times=20
         opera_true_bias.append(bias)
         opera_true_variance.append(variance)
 
+        opera_scores.append(scores)
+        opera_alphas.append(alphas)
+        opera_cvx_loss.append(cvxpy_losses)
+
     bootstrap_mse['opera'] = opera_true_mse
     bootstrap_bias['opera'] = opera_true_bias
     bootstrap_variance['opera'] = opera_true_variance
+    opera_running_stats['bootstrap_mse']['scores'] = opera_scores
+    opera_running_stats['bootstrap_mse']['alphas'] = opera_alphas
+    opera_running_stats['bootstrap_mse']['cvx_loss'] = opera_cvx_loss
 
-    pickle.dump(true_mse, open('sepsis_analysis_stats/true_mse.pkl', 'wb'))
-    pickle.dump(true_bias, open('sepsis_analysis_stats/true_bias.pkl', 'wb'))
-    pickle.dump(true_variance, open('sepsis_analysis_stats/true_variance.pkl', 'wb'))
-    pickle.dump(bootstrap_mse, open('sepsis_analysis_stats/bootstrap_mse.pkl', 'wb'))
-    pickle.dump(bootstrap_bias, open('sepsis_analysis_stats/bootstrap_bias.pkl', 'wb'))
-    pickle.dump(bootstrap_variance, open('sepsis_analysis_stats/bootstrap_variance.pkl', 'wb'))
+    stats_folder_name = 'sepsis_analysis_stats3'
+
+    pickle.dump(true_mse, open(f'{stats_folder_name}/{env}_true_mse.pkl', 'wb'))
+    pickle.dump(true_bias, open(f'{stats_folder_name}/{env}_true_bias.pkl', 'wb'))
+    pickle.dump(true_variance, open(f'{stats_folder_name}/{env}_true_variance.pkl', 'wb'))
+    pickle.dump(bootstrap_mse, open(f'{stats_folder_name}/{env}_bootstrap_mse.pkl', 'wb'))
+    pickle.dump(bootstrap_bias, open(f'{stats_folder_name}/{env}_bootstrap_bias.pkl', 'wb'))
+    pickle.dump(bootstrap_variance, open(f'{stats_folder_name}/{env}_bootstrap_variance.pkl', 'wb'))
+    pickle.dump(opera_running_stats, open(f'{stats_folder_name}/{env}_opera_running_stats.pkl', 'wb'))
 
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_dir', type=str, default="sepsis_analysis_results")
+    parser.add_argument('--load_dir', type=str, default="sepsis_analysis_results")
     parser.add_argument('--env', type=str, default="pomdp")
 
     # use True MSE
@@ -232,6 +266,8 @@ if __name__ == '__main__':
     # we will use 4 estimators: IS, WIS, Clipped IS, Clipped WIS
     # to basically show trade-offs
 
+    # Need to decide if we take off FQE
+
     print(args)
 
     # ==== Load the policy ====
@@ -242,7 +278,9 @@ if __name__ == '__main__':
         policies = load_sepsis_ensemble_mdp_policies(sepsis)
 
     opt_policy = policies[0]
-    opt_true_perf = POLICY_TRUE_MEAN_PERF[0] if args.env == 'pomdp' else MDP_POLICY_TURE_PERF[0]
+    opt_true_perf = POLICY_TRUE_MEAN_PERF[0] if args.env == 'pomdp' else MDP_POLICY_TURE_MEAN_PERF[0]
 
     # ===== End =======
-    compute_opera_scores()
+    estimator_names = ['IS', 'WIS', 'FQE']  # , 'FQE' 'CLIS', 'CLWIS'
+
+    compute_opera_scores(args.env, estimator_names)

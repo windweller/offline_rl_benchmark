@@ -55,7 +55,6 @@ def cross_fit_fqe_scorer(sepsis, dataset):
 
     return score
 
-
 def save_true_MSE_for_scorer(env, n, scorer_name, save_dir):
     assert env in {'pomdp', 'mdp'}
     sample_times = 50
@@ -71,9 +70,12 @@ def save_true_MSE_for_scorer(env, n, scorer_name, save_dir):
 def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer_name, save_dir):
     assert env in {'pomdp', 'mdp'}
     bootstrap_stats = np.zeros((sample_times, n_copies))
+    ope_scores = np.zeros((sample_times))
 
     for d_i in tqdm(range(sample_times)):
         dataset, sepsis, pd_data = get_sepsis_gt(env, n)
+        ope_scores[d_i] = cross_fit_fqe_scorer(sepsis, dataset)
+
         k = int(n ** 0.6)
         k_prop = k / n
         datasets, sepsis, traj_dist, scale_ratio = get_sepsis_copies(pd_data, sepsis, n_copies, k_prop=k_prop)
@@ -82,8 +84,7 @@ def save_bootstrap_MSE_for_scorer(env, n, n_copies, sample_times, scorer_name, s
             bootstrap_stats[d_i, j] = score
 
     np.savez(f'{save_dir}/env_{env}_bootstrap_MSE_{scorer_name}_n_{n}.npz', bootstrap_stats=bootstrap_stats,
-             n_copies=n_copies,
-             sample_times=sample_times)
+             n_copies=n_copies, sample_times=sample_times, scale_ratio=scale_ratio, ope_scores=ope_scores)
 
 
 if __name__ == '__main__':

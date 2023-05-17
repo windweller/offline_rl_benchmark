@@ -5,11 +5,11 @@ We produce the stats files necessary for Sepsis analysis
 from offline_rl.envs.datasets import get_sepsis, get_sepsis_boostrap_copies, get_sepsis_ensemble_datasets, \
     get_sepsis_subsample_copies, get_sepsis_population_full, get_sepsis_gt, get_sepsis_copies
 from offline_rl.envs.sepsis.behavior_policy import load_sepsis_ensemble_policies, POLICY_TRUE_MEAN_PERF, \
-    load_sepsis_ensemble_mdp_policies, MDP_POLICY_TURE_PERF
+    load_sepsis_ensemble_mdp_policies, MDP_POLICY_TURE_MEAN_PERF
 
 from offline_rl.envs.dataset import convert_dataset_for_is_ope
 from offline_rl.opes.importance_sampling import compute_pib_pie, importance_sampling_scorer, wis_scorer, \
-    cwpdis_scorer, pdis_scorer
+    cwpdis_scorer, pdis_scorer, importance_sampling_scorer_with_weights
 
 from tqdm import tqdm
 import pandas as pd
@@ -74,13 +74,14 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_dir', type=str, default="sepsis_analysis_results2")
+    parser.add_argument('--save_dir', type=str, default="sepsis_analysis_results")
     parser.add_argument('--env', type=str, default="pomdp")
     parser.add_argument('--scorer', type=str, default='IS', choices=['IS', 'WIS', 'CLIS', 'CLWIS'])
     parser.add_argument('--clip', type=float, default=0.02)
 
     # for True MSE
     parser.add_argument('--compute_true_mse', action='store_true')
+    # MAGIC doesn't use bootstrap, so we only need to save it for True MSE case
     parser.add_argument('--n', type=int, default=100)
 
     # for Bootstrap MSE
@@ -104,7 +105,7 @@ if __name__ == '__main__':
         policies = load_sepsis_ensemble_mdp_policies(sepsis)
 
     opt_policy = policies[0]
-    opt_true_perf = POLICY_TRUE_MEAN_PERF[0] if args.env == 'pomdp' else MDP_POLICY_TURE_PERF[0]
+    opt_true_perf = POLICY_TRUE_MEAN_PERF[0] if args.env == 'pomdp' else MDP_POLICY_TURE_MEAN_PERF[0]
 
     # ===== End =======
 

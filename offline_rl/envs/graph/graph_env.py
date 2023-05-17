@@ -5,8 +5,6 @@ from gym import spaces
 import numpy as np
 import d3rlpy
 
-from offline_rl.opes import importance_sampling
-from offline_rl.envs import dataset
 from offline_rl.algs.policy_evaluation_wrappers import *
 from d3rlpy.algos.base import *
 from gym.envs.registration import register
@@ -250,6 +248,9 @@ class GraphPolicy(AlgoBase, DiscreteProbabilisticPolicyProtocol):
         )
         self.noise_level = noise_level
         self.noise_fn = noise_fn
+        if env:
+            n_s = len(env.state_to_pomdp_state) if not env.make_pomdp else env.number_of_pomdp_states
+            self.policy_map = dict(zip(range(n_s), self.predict_action_probabilities(np.arange(n_s))))
 
     def predict(self, x):
         x = np.array(x)
@@ -281,13 +282,13 @@ if 'GraphEnv-v0' not in gym.envs.registry.env_specs:
 ### Example usage:
 
 if __name__ == '__main__':
-    env = gym.make('GraphEnv-v0', max_length = 10)
+    env = gym.make('GraphEnv-v0', max_length = 100)
 
-    policy1 = GraphPolicy()
-    policy2 = GraphPolicy(noise_level = 0.25)
-    policy3 = GraphPolicy(noise_level = 0.75)
-    policy4 = GraphPolicy(noise_fn = lambda s: np.where(s % 2 == 0, 0, 0.75))
-    policy5 = GraphPolicy(noise_fn = lambda s: np.where(s % 2 == 0, 0.2, 0.1))
+    policy1 = GraphPolicy(env = env)
+    policy2 = GraphPolicy(noise_level = 0.25, env = env)
+    policy3 = GraphPolicy(noise_level = 0.75, env = env)
+    policy4 = GraphPolicy(noise_fn = lambda s: np.where(s % 2 == 0, 0, 0.75), env = env)
+    policy5 = GraphPolicy(noise_fn = lambda s: np.where(s % 2 == 0, 0.2, 0.1), env = env)
 
     eval_fn = evaluate_on_environment(env, gamma = 1)
     print("Policy 1 (optimal) return:", eval_fn(policy1))
